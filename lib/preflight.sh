@@ -22,7 +22,7 @@ detect_os() {
 install_base_packages() {
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -y
-    apt-get install -y ca-certificates curl gnupg openssl jq python3 iproute2 dnsutils
+    apt-get install -y ca-certificates curl gnupg openssl jq python3 iproute2 dnsutils ufw
 }
 
 install_docker() {
