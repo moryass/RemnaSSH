@@ -19,6 +19,11 @@ install_runtime_files() {
 
 generate_reality_keys() {
     local output
+    if [[ -n "${REALITY_PRIVATE_KEY:-}" && -n "${REALITY_PUBLIC_KEY:-}" ]]; then
+        ok "Использую существующие ключи REALITY"
+        return
+    fi
+
     info "Генерирую ключи REALITY"
     docker pull "${REMNANODE_IMAGE:-$REMNANODE_IMAGE_DEFAULT}" >/dev/null
     output="$(docker run --rm --entrypoint /usr/local/bin/xray \
