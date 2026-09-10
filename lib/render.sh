@@ -46,10 +46,13 @@ write_secret() {
 
 render_stack() {
     local template_dir="$INSTALL_DIR/tool/templates"
+    local site_template="$template_dir/$SITE_TEMPLATE"
+    [[ -f "$site_template" ]] || die "Не найден шаблон сайта: $SITE_TEMPLATE"
+
     sed \
         -e "s|__DOMAIN__|$NODE_DOMAIN|g" \
         -e "s|__EMAIL__|$ACME_EMAIL|g" \
-        "$template_dir/index.html.tpl" > "$INSTALL_DIR/www/index.html"
+        "$site_template" > "$INSTALL_DIR/www/index.html"
 
     cp "$template_dir/Caddyfile.tpl" "$INSTALL_DIR/Caddyfile.final"
     cp "$template_dir/Caddyfile.bootstrap.tpl" "$INSTALL_DIR/Caddyfile.bootstrap"

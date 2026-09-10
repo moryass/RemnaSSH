@@ -39,6 +39,8 @@ sudo bash install.sh install \
 
 После установки готовый профиль будет находиться в `/opt/remnanode/full-profile.json`, а параметры подключений — в `/opt/remnanode/connection-settings.txt`.
 
+Для обычных HTTPS-запросов установщик выбирает один из встроенных сайтов-заглушек. Выбранный шаблон сохраняется при повторной установке.
+
 ## Настройка панели
 
 1. Создайте Config Profile и вставьте содержимое `/opt/remnanode/full-profile.json`.

@@ -111,6 +111,7 @@ load_state() {
     # Values are escaped with printf %q and the file is owned by root.
     # shellcheck source=/dev/null
     source "$STATE_FILE"
+    SITE_TEMPLATE="${SITE_TEMPLATE:-site-studio.html.tpl}"
 }
 
 write_state() {
@@ -123,6 +124,7 @@ write_state() {
         printf 'CADDY_INTERNAL_PORT=%q\n' "$CADDY_INTERNAL_PORT"
         printf 'XHTTP_MODE=%q\n' "$XHTTP_MODE"
         printf 'XHTTP_PATH=%q\n' "$XHTTP_PATH"
+        printf 'SITE_TEMPLATE=%q\n' "${SITE_TEMPLATE:-site-studio.html.tpl}"
         printf 'REALITY_PRIVATE_KEY=%q\n' "$REALITY_PRIVATE_KEY"
         printf 'REALITY_PUBLIC_KEY=%q\n' "$REALITY_PUBLIC_KEY"
         printf 'REALITY_SHORT_ID=%q\n' "$REALITY_SHORT_ID"
