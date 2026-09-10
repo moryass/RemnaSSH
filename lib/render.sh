@@ -112,13 +112,17 @@ start_stack() {
     docker compose up -d --remove-orphans remnanode
 
     local _ health
+    info "Проверяю Caddy на внутреннем HTTPS-порту"
     for _ in $(seq 1 24); do
         health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' remnassh-caddy 2>/dev/null || true)"
         [[ "$health" == healthy ]] && break
-        [[ "$health" == unhealthy ]] && docker compose logs --tail=80 caddy >&2
         sleep 5
     done
-    [[ "$health" == healthy ]] || die "Caddy не прошёл healthcheck после переключения на self-steal"
+    if [[ "$health" != healthy ]]; then
+        docker inspect -f '{{range .State.Health.Log}}{{println .Output}}{{end}}' remnassh-caddy >&2 2>/dev/null || true
+        docker compose logs --tail=80 caddy >&2 || true
+        die "Caddy не прошёл healthcheck после переключения на self-steal"
+    fi
     ok "Caddy и Remnawave Node запущены"
 }
 

@@ -17,6 +17,8 @@ services:
     hostname: remnassh-caddy
     env_file:
       - .env
+    extra_hosts:
+      - "${NODE_DOMAIN}:127.0.0.1"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./www:/srv/www:ro
@@ -24,7 +26,7 @@ services:
       - ./caddy-config:/config
       - /dev/shm:/dev/shm:rw
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider --no-check-certificate --header='Host: $${NODE_DOMAIN}' https://127.0.0.1:$${CADDY_INTERNAL_PORT}/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider --no-check-certificate https://$${NODE_DOMAIN}:$${CADDY_INTERNAL_PORT}/ || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 18
