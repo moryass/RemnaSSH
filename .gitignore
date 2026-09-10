@@ -1,0 +1,8 @@
+.idea/
+.vscode/
+*.log
+.env
+state.env
+secret-key
+node.env
+full-profile.json
