@@ -3,6 +3,56 @@
 set -Eeuo pipefail
 umask 077
 
+bootstrap_if_needed() {
+    local source_path source_dir tmp_dir archive archive_url archive_root installer status
+    source_path="$(readlink -f -- "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")"
+    source_dir="$(cd -- "$(dirname -- "$source_path")" 2>/dev/null && pwd || true)"
+    [[ -n "$source_dir" && -f "$source_dir/lib/common.sh" ]] && return
+
+    command -v curl >/dev/null 2>&1 || {
+        printf '[x] curl is required for the one-line installer.\n' >&2
+        exit 1
+    }
+    command -v tar >/dev/null 2>&1 || {
+        printf '[x] tar is required for the one-line installer.\n' >&2
+        exit 1
+    }
+
+    tmp_dir="$(mktemp -d)"
+    archive="$tmp_dir/remnassh.tar.gz"
+    archive_url="${REMNASSH_ARCHIVE_URL:-https://github.com/moryass/RemnaSSH/archive/refs/heads/main.tar.gz}"
+    archive_root="${REMNASSH_ARCHIVE_ROOT:-RemnaSSH-main}"
+    installer="$tmp_dir/$archive_root/install.sh"
+
+    # Called by the trap below.
+    # shellcheck disable=SC2329
+    cleanup_bootstrap() {
+        [[ -n "${tmp_dir:-}" && -d "$tmp_dir" ]] && rm -rf -- "$tmp_dir"
+    }
+    trap cleanup_bootstrap EXIT INT TERM
+
+    printf '[*] Downloading RemnaSSH...\n'
+    curl -fsSL --retry 3 --connect-timeout 15 "$archive_url" -o "$archive"
+    tar -xzf "$archive" -C "$tmp_dir"
+    [[ -f "$installer" ]] || {
+        printf '[x] The downloaded archive does not contain install.sh.\n' >&2
+        exit 1
+    }
+
+    if [[ "$(id -u)" -eq 0 ]]; then
+        bash "$installer" "$@"
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo bash "$installer" "$@"
+    else
+        printf '[x] Root privileges are required. Run the command as root.\n' >&2
+        exit 1
+    fi
+    status=$?
+    exit "$status"
+}
+
+bootstrap_if_needed "$@"
+
 SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
 
@@ -14,8 +64,12 @@ source "$SCRIPT_DIR/lib/preflight.sh"
 source "$SCRIPT_DIR/lib/render.sh"
 # shellcheck source=lib/firewall.sh
 source "$SCRIPT_DIR/lib/firewall.sh"
+# shellcheck source=lib/tuning.sh
+source "$SCRIPT_DIR/lib/tuning.sh"
 # shellcheck source=lib/diagnostics.sh
 source "$SCRIPT_DIR/lib/diagnostics.sh"
+# shellcheck source=lib/maintenance.sh
+source "$SCRIPT_DIR/lib/maintenance.sh"
 
 usage() {
     cat <<'EOF'
@@ -27,6 +81,7 @@ Usage:
   sudo bash install.sh status
   sudo bash install.sh diagnostics
   sudo bash install.sh update
+  sudo bash install.sh backup
 
 Install options:
   --domain DOMAIN             Domain whose A/AAAA record points to this server
@@ -142,6 +197,7 @@ install_stack() {
     render_stack
     validate_rendered_files
     configure_firewall
+    configure_network_tuning
     start_stack
     validate_xray_profile
     install_command
@@ -163,6 +219,7 @@ update_stack() {
     require_root
     load_state
     require_command docker
+    backup_stack
     cd "$INSTALL_DIR"
     docker compose pull
     docker compose up -d --remove-orphans
@@ -185,6 +242,7 @@ main() {
         status) status_report ;;
         diagnostics|doctor) diagnostics ;;
         update) update_stack ;;
+        backup) backup_stack ;;
         -h|--help|help) usage ;;
         *) usage; die "Неизвестная команда: $command" ;;
     esac

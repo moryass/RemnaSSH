@@ -20,6 +20,17 @@ Caddy обслуживает обычные HTTPS-запросы и переда
 
 ## Установка
 
+Одной командой:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/moryass/RemnaSSH/main/install.sh)
+```
+
+Установщик сам запросит домен, email, IP панели и Secret Key ноды. Если команда запущена не от root, будет использован `sudo`.
+Повторный запуск этой команды обновляет файлы установщика и сохраняет ранее созданные ключи REALITY и XHTTP path.
+
+Установка из клонированного репозитория:
+
 ```bash
 git clone https://github.com/moryass/RemnaSSH.git
 cd RemnaSSH
@@ -84,8 +95,11 @@ sudo remnassh status
 sudo remnassh diagnostics
 sudo remnassh update
 sudo remnassh generate
+sudo remnassh backup
 ```
 
 Конфигурация хранится в `/opt/remnanode`. Caddy автоматически обновляет TLS-сертификат, Xray перечитывает его без ручного перезапуска.
+
+Если ядро поддерживает BBR, установщик включает BBR с очередью `fq`. UDP-буферы увеличиваются до 16 MiB для стабильной работы Hysteria2 на быстрых соединениях. Перед обновлением контейнеров автоматически создаётся резервная копия конфигурации.
 
 Private networks и BitTorrent блокируются правилами профиля. Остальной разрешённый трафик выходит напрямую с IP сервера.

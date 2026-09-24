@@ -2,6 +2,7 @@ name: remnassh-node
 
 x-common: &common
   restart: unless-stopped
+  stop_grace_period: 30s
   network_mode: host
   logging:
     driver: json-file
@@ -41,6 +42,9 @@ services:
       - NET_ADMIN
     env_file:
       - node.env
+    depends_on:
+      caddy:
+        condition: service_healthy
     volumes:
       - ./caddy-data:/data:ro
       - /dev/shm:/dev/shm:rw

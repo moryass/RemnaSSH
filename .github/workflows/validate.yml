@@ -1,0 +1,53 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check shell syntax
+        run: bash -n install.sh lib/*.sh
+
+      - name: Run ShellCheck
+        run: shellcheck -x install.sh
+
+      - name: Validate profile template
+        run: jq -e . templates/full-profile.json.tpl >/dev/null
+
+      - name: Validate Compose template
+        run: |
+          work="$(mktemp -d)"
+          sed \
+            -e 's|__CADDY_IMAGE__|caddy:2.11.4-alpine|g' \
+            -e 's|__REMNANODE_IMAGE__|remnawave/node:3.4.1|g' \
+            templates/docker-compose.yml.tpl > "$work/docker-compose.yml"
+          printf '%s\n' \
+            'NODE_DOMAIN=node.example.com' \
+            'CADDY_INTERNAL_PORT=8443' > "$work/.env"
+          printf '%s\n' 'NODE_PORT=2222' 'SECRET_KEY=test' > "$work/node.env"
+          touch "$work/Caddyfile"
+          mkdir -p "$work/www" "$work/caddy-data" "$work/caddy-config"
+          docker compose -f "$work/docker-compose.yml" config --quiet
+
+      - name: Test installed command symlink
+        run: |
+          ln -s "$PWD/install.sh" /tmp/remnassh
+          /tmp/remnassh help | grep -q 'sudo bash install.sh backup'
+
+      - name: Test standalone bootstrap
+        run: |
+          stage="$(mktemp -d)"
+          mkdir -p "$stage/RemnaSSH-main"
+          cp -a . "$stage/RemnaSSH-main/"
+          tar -czf "$stage/remnassh.tar.gz" -C "$stage" RemnaSSH-main
+          cp install.sh "$stage/standalone-install.sh"
+          REMNASSH_ARCHIVE_URL="file://$stage/remnassh.tar.gz" \
+            bash "$stage/standalone-install.sh" help | grep -q 'RemnaSSH'

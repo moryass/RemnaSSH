@@ -26,7 +26,6 @@
           "target": "127.0.0.1:__CADDY_INTERNAL_PORT__",
           "serverNames": ["__DOMAIN__"],
           "privateKey": "__REALITY_PRIVATE_KEY__",
-          "minClientVer": "1.8.1",
           "shortIds": ["__REALITY_SHORT_ID__"]
         }
       }

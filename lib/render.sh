@@ -116,8 +116,10 @@ start_stack() {
     fi
 
     cp "$INSTALL_DIR/Caddyfile.final" "$INSTALL_DIR/Caddyfile"
-    docker compose up -d --force-recreate caddy
-    docker compose up -d --remove-orphans remnanode
+    docker compose up -d caddy
+    if container_running remnassh-caddy; then
+        docker compose kill -s SIGUSR1 caddy >/dev/null 2>&1 || docker compose up -d --force-recreate caddy
+    fi
 
     local _ health
     info "Проверяю Caddy на внутреннем HTTPS-порту"
@@ -131,6 +133,7 @@ start_stack() {
         docker compose logs --tail=80 caddy >&2 || true
         die "Caddy не прошёл healthcheck после переключения на self-steal"
     fi
+    docker compose up -d --remove-orphans remnanode
     ok "Caddy и Remnawave Node запущены"
 }
 
