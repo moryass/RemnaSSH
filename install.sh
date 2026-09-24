@@ -6,7 +6,9 @@ umask 077
 bootstrap_if_needed() {
     local source_path source_dir tmp_dir archive archive_url archive_root installer status
     source_path="$(readlink -f -- "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")"
-    source_dir="$(cd -- "$(dirname -- "$source_path")" 2>/dev/null && pwd || true)"
+    if ! source_dir="$(cd -- "$(dirname -- "$source_path")" 2>/dev/null && pwd)"; then
+        source_dir=""
+    fi
     [[ -n "$source_dir" && -f "$source_dir/lib/common.sh" ]] && return
 
     command -v curl >/dev/null 2>&1 || {
@@ -27,6 +29,7 @@ bootstrap_if_needed() {
     # Called by the trap below.
     # shellcheck disable=SC2329
     cleanup_bootstrap() {
+        # shellcheck disable=SC2317
         [[ -n "${tmp_dir:-}" && -d "$tmp_dir" ]] && rm -rf -- "$tmp_dir"
     }
     trap cleanup_bootstrap EXIT INT TERM
