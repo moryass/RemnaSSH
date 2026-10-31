@@ -1,12 +1,13 @@
 # RemnaSSH
 
-Установщик Remnawave Node для Ubuntu и Debian. Поднимает три подключения на одном публичном порту:
+Установщик Remnawave Node для Ubuntu и Debian. Поднимает четыре подключения на одном публичном порту:
 
 - VLESS RAW + REALITY + Vision — `443/tcp`;
 - VLESS XHTTP + TLS — `443/tcp`;
+- VLESS gRPC + TLS — `443/tcp`;
 - Hysteria2 + TLS — `443/udp`.
 
-Caddy обслуживает обычные HTTPS-запросы и передаёт XHTTP-трафик в Xray через Unix socket. Снаружи нужны только `80/tcp`, `443/tcp`, `443/udp` и порт Node API, доступный с IP панели.
+Caddy обслуживает обычные HTTPS-запросы и передаёт XHTTP/gRPC-трафик в Xray через отдельные Unix sockets. Снаружи нужны только `80/tcp`, `443/tcp`, `443/udp` и порт Node API, доступный с IP панели.
 
 ## Требования
 
@@ -48,14 +49,14 @@ sudo bash install.sh install \
   --yes
 ```
 
-После установки готовый профиль будет находиться в `/opt/remnanode/full-profile.json`, а параметры подключений — в `/opt/remnanode/connection-settings.txt`.
+После установки профиль ноды будет находиться в `/opt/remnanode/full-profile.json`, готовый Happ-балансировщик — в `/opt/remnanode/happ-balancer.json`, а параметры подключений — в `/opt/remnanode/connection-settings.txt`.
 
 Для обычных HTTPS-запросов установщик выбирает один из встроенных сайтов-заглушек. Выбранный шаблон сохраняется при повторной установке.
 
 ## Настройка панели
 
 1. Создайте Config Profile и вставьте содержимое `/opt/remnanode/full-profile.json`.
-2. Назначьте профиль ноде и включите три inbound.
+2. Назначьте профиль ноде и включите четыре inbound.
 3. Добавьте inbound в нужный Internal Squad.
 4. Создайте Hosts с параметрами ниже.
 
@@ -79,6 +80,16 @@ sudo bash install.sh install \
 - Path и Mode: из `connection-settings.txt`
 - Fingerprint: `chrome`
 
+### VLESS gRPC
+
+- Address: домен ноды
+- Port: `443`
+- Security: `tls`
+- SNI/Authority: домен ноды
+- ALPN: `h2`
+- Service Name: из `connection-settings.txt`
+- Fingerprint: `chrome`
+
 ### Hysteria2
 
 - Address/SNI: домен ноды
@@ -87,6 +98,26 @@ sudo bash install.sh install \
 - ALPN: `h3`
 
 Для Hysteria2 в качестве пароля используется UUID пользователя.
+
+## Балансировщик Happ
+
+Файл `/opt/remnanode/happ-balancer.json` предназначен для Xray JSON Template в Remnawave. Он использует следующий порядок переключения:
+
+1. XHTTP + TLS;
+2. gRPC + TLS (аварийный транспорт для сетей, где XHTTP фильтруется);
+3. REALITY + Vision;
+4. Hysteria2 + TLS.
+
+У каждого Host в панели должен быть назначен соответствующий тег:
+
+- `p4-grpc` — gRPC;
+- `p3-xhttp` — XHTTP;
+- `p1-vless` — REALITY;
+- `p2-hysteria` — Hysteria2.
+
+Hosts, которые должны автоматически добавляться в балансировщик, создаются скрытыми (`HIDDEN`). Можно добавить несколько нод в каждую группу. `leastLoad` выбирает доступный Host с подходящей задержкой, а `burstObservatory` выполняет три проверки каждую минуту. Российские домены и IP направляются напрямую, BitTorrent блокируется без утечки реального адреса.
+
+Для реальной устойчивости основные ноды должны находиться у разных хостинг-провайдеров и желательно в разных ASN. Несколько протоколов на одном заблокированном IP не заменяют резервную ноду.
 
 ## Команды
 
@@ -100,6 +131,6 @@ sudo remnassh backup
 
 Конфигурация хранится в `/opt/remnanode`. Caddy автоматически обновляет TLS-сертификат, Xray перечитывает его без ручного перезапуска.
 
-Если ядро поддерживает BBR, установщик включает BBR с очередью `fq`. UDP-буферы увеличиваются до 16 MiB для стабильной работы Hysteria2 на быстрых соединениях. Перед обновлением контейнеров автоматически создаётся резервная копия конфигурации.
+Если ядро поддерживает BBR, установщик включает BBR с очередью `fq`, MTU probing и TCP keepalive. UDP-буферы увеличиваются до 40 MiB для стабильной работы Hysteria2 на быстрых соединениях. Перед обновлением контейнеров автоматически создаётся резервная копия конфигурации.
 
 Private networks и BitTorrent блокируются правилами профиля. Остальной разрешённый трафик выходит напрямую с IP сервера.

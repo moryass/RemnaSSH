@@ -69,6 +69,7 @@ render_stack() {
         printf 'ACME_EMAIL=%s\n' "$ACME_EMAIL"
         printf 'CADDY_INTERNAL_PORT=%s\n' "$CADDY_INTERNAL_PORT"
         printf 'XHTTP_PATH=%s\n' "$XHTTP_PATH"
+        printf 'GRPC_SERVICE_NAME=%s\n' "$GRPC_SERVICE_NAME"
     } > "$INSTALL_DIR/.env"
 
     chmod 600 "$INSTALL_DIR/.env" "$INSTALL_DIR/docker-compose.yml"
@@ -78,21 +79,27 @@ render_stack() {
 
 render_profile() {
     local source_template="$INSTALL_DIR/tool/templates/full-profile.json.tpl"
+    local balancer_template="$INSTALL_DIR/tool/templates/happ-balancer.json"
     [[ -f "$source_template" ]] || source_template="$SCRIPT_DIR/templates/full-profile.json.tpl"
+    [[ -f "$balancer_template" ]] || balancer_template="$SCRIPT_DIR/templates/happ-balancer.json"
 
     sed \
         -e "s|__DOMAIN__|$NODE_DOMAIN|g" \
         -e "s|__CADDY_INTERNAL_PORT__|$CADDY_INTERNAL_PORT|g" \
         -e "s|__XHTTP_PATH__|$XHTTP_PATH|g" \
         -e "s|__XHTTP_MODE__|$XHTTP_MODE|g" \
+        -e "s|__GRPC_SERVICE_NAME__|$GRPC_SERVICE_NAME|g" \
         -e "s|__REALITY_PRIVATE_KEY__|$REALITY_PRIVATE_KEY|g" \
         -e "s|__REALITY_SHORT_ID__|$REALITY_SHORT_ID|g" \
         "$source_template" > "$PROFILE_FILE"
+    cp "$balancer_template" "$BALANCER_FILE"
     chmod 600 "$PROFILE_FILE"
+    chmod 644 "$BALANCER_FILE"
 }
 
 validate_rendered_files() {
     jq -e . "$PROFILE_FILE" >/dev/null || die "Сгенерирован некорректный JSON"
+    jq -e . "$BALANCER_FILE" >/dev/null || die "Сгенерирован некорректный JSON балансировщика"
     cd "$INSTALL_DIR" || die "Не удалось перейти в $INSTALL_DIR"
     docker compose config --quiet
     docker compose run --rm --no-deps --entrypoint caddy caddy \
@@ -191,6 +198,8 @@ Reality SNI: $NODE_DOMAIN
 XHTTP path: $XHTTP_PATH
 XHTTP mode: $XHTTP_MODE
 XHTTP TLS SNI: $NODE_DOMAIN
+gRPC service name: $GRPC_SERVICE_NAME
+gRPC TLS SNI: $NODE_DOMAIN
 Hysteria2 SNI: $NODE_DOMAIN
 Remnawave Node port: $NODE_PORT/tcp (allowed from $PANEL_IP)
 EOF
@@ -199,6 +208,7 @@ EOF
     printf '\n'
     ok "Установка завершена"
     printf '  Config Profile: %s\n' "$PROFILE_FILE"
+    printf '  Happ balancer:  %s\n' "$BALANCER_FILE"
     printf '  Host settings:  %s\n' "$INSTALL_DIR/connection-settings.txt"
     printf '  Диагностика:     sudo remnassh diagnostics\n\n'
     warn "443/tcp и 443/udp начнут слушаться после назначения full-profile.json ноде в Remnawave."

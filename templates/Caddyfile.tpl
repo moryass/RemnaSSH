@@ -33,6 +33,19 @@ https://{$NODE_DOMAIN} {
 		X-Frame-Options "DENY"
 	}
 
+	@grpc {
+		protocol grpc
+		path /{$GRPC_SERVICE_NAME}/*
+	}
+	handle @grpc {
+		reverse_proxy unix//dev/shm/remnassh-grpc.sock {
+			flush_interval -1
+			transport http {
+				versions h2c
+			}
+		}
+	}
+
 	@xhttp path {$XHTTP_PATH}*
 	handle @xhttp {
 		reverse_proxy unix//dev/shm/remnassh-xhttp.sock {

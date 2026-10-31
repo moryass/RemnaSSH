@@ -89,6 +89,28 @@
           "udpIdleTimeout": 60
         }
       }
+    },
+    {
+      "tag": "VLESS_GRPC_CADDY",
+      "listen": "/dev/shm/remnassh-grpc.sock,0666",
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "sniffing": {
+        "enabled": true,
+        "routeOnly": true,
+        "destOverride": ["http", "tls", "quic"]
+      },
+      "streamSettings": {
+        "network": "grpc",
+        "security": "none",
+        "grpcSettings": {
+          "serviceName": "__GRPC_SERVICE_NAME__",
+          "multiMode": false
+        }
+      }
     }
   ],
   "outbounds": [

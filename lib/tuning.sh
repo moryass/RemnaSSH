@@ -15,8 +15,13 @@ configure_network_tuning() {
         if [[ " $available " == *" bbr "* ]]; then
             printf '%s\n' 'net.ipv4.tcp_congestion_control = bbr'
         fi
-        printf '%s\n' 'net.core.rmem_max = 16777216'
-        printf '%s\n' 'net.core.wmem_max = 16777216'
+        printf '%s\n' 'net.core.rmem_max = 41943040'
+        printf '%s\n' 'net.core.wmem_max = 41943040'
+        printf '%s\n' 'net.core.netdev_max_backlog = 4096'
+        printf '%s\n' 'net.ipv4.tcp_mtu_probing = 1'
+        printf '%s\n' 'net.ipv4.tcp_keepalive_time = 600'
+        printf '%s\n' 'net.ipv4.tcp_keepalive_intvl = 30'
+        printf '%s\n' 'net.ipv4.tcp_keepalive_probes = 5'
     } > "$tmp_file"
 
     chmod 0644 "$tmp_file"
@@ -27,7 +32,7 @@ configure_network_tuning() {
     fi
 
     if [[ " $available " == *" bbr "* ]]; then
-        ok "BBR + fq включены; UDP-буферы увеличены до 16 MiB"
+        ok "BBR + fq включены; UDP-буферы увеличены до 40 MiB"
     else
         warn "BBR недоступен в текущем ядре; применены fq и UDP-буферы"
     fi

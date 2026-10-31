@@ -1,0 +1,296 @@
+{
+  "dns": {
+    "servers": [
+      "https://1.1.1.1/dns-query",
+      "https://8.8.8.8/dns-query"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "stats": {},
+  "policy": {
+    "levels": {
+      "8": {
+        "handshake": 4,
+        "connIdle": 300,
+        "uplinkOnly": 1,
+        "downlinkOnly": 1
+      }
+    },
+    "system": {
+      "statsOutboundUplink": true,
+      "statsOutboundDownlink": true
+    }
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "routeOnly": false,
+        "destOverride": ["http", "tls", "quic"]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "routeOnly": false,
+        "destOverride": ["http", "tls", "quic"]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "direct",
+      "protocol": "freedom",
+      "streamSettings": {
+        "sockopt": {
+          "domainStrategy": "UseIPv4"
+        }
+      }
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    },
+    {
+      "tag": "LOOP_TO_GRPC",
+      "protocol": "loopback",
+      "settings": {
+        "inboundTag": "FAILOVER_GRPC"
+      }
+    },
+    {
+      "tag": "LOOP_TO_REALITY",
+      "protocol": "loopback",
+      "settings": {
+        "inboundTag": "FAILOVER_REALITY"
+      }
+    },
+    {
+      "tag": "LOOP_TO_HYSTERIA",
+      "protocol": "loopback",
+      "settings": {
+        "inboundTag": "FAILOVER_HYSTERIA"
+      }
+    }
+  ],
+  "routing": {
+    "domainStrategy": "IPIfNonMatch",
+    "domainMatcher": "hybrid",
+    "balancers": [
+      {
+        "tag": "PRIORITY_XHTTP",
+        "selector": ["p3-xhttp"],
+        "strategy": {
+          "type": "leastLoad",
+          "settings": {
+            "expected": 3,
+            "maxRTT": "1500ms",
+            "tolerance": 0,
+            "baselines": ["200ms", "500ms"]
+          }
+        },
+        "fallbackTag": "LOOP_TO_GRPC"
+      },
+      {
+        "tag": "PRIORITY_GRPC",
+        "selector": ["p4-grpc"],
+        "strategy": {
+          "type": "leastLoad",
+          "settings": {
+            "expected": 3,
+            "maxRTT": "1500ms",
+            "tolerance": 0,
+            "baselines": ["200ms", "500ms"]
+          }
+        },
+        "fallbackTag": "LOOP_TO_REALITY"
+      },
+      {
+        "tag": "PRIORITY_REALITY",
+        "selector": ["p1-vless"],
+        "strategy": {
+          "type": "leastLoad",
+          "settings": {
+            "expected": 3,
+            "maxRTT": "1500ms",
+            "tolerance": 0,
+            "baselines": ["200ms", "500ms"]
+          }
+        },
+        "fallbackTag": "LOOP_TO_HYSTERIA"
+      },
+      {
+        "tag": "PRIORITY_HYSTERIA",
+        "selector": ["p2-hysteria"],
+        "strategy": {
+          "type": "leastLoad",
+          "settings": {
+            "expected": 2,
+            "maxRTT": "1800ms",
+            "tolerance": 0,
+            "baselines": ["250ms", "700ms"]
+          }
+        },
+        "fallbackTag": "block"
+      }
+    ],
+    "rules": [
+      {
+        "type": "field",
+        "inboundTag": ["FAILOVER_GRPC"],
+        "balancerTag": "PRIORITY_GRPC"
+      },
+      {
+        "type": "field",
+        "inboundTag": ["FAILOVER_REALITY"],
+        "balancerTag": "PRIORITY_REALITY"
+      },
+      {
+        "type": "field",
+        "inboundTag": ["FAILOVER_HYSTERIA"],
+        "balancerTag": "PRIORITY_HYSTERIA"
+      },
+      {
+        "type": "field",
+        "protocol": ["bittorrent"],
+        "outboundTag": "block"
+      },
+      {
+        "type": "field",
+        "domain": [
+          "domain:lava.ru",
+          "domain:habr.com",
+          "domain:4pda.to",
+          "domain:4pda.ru"
+        ],
+        "balancerTag": "PRIORITY_XHTTP"
+      },
+      {
+        "type": "field",
+        "domain": [
+          "geosite:category-ru",
+          "regexp:^.*\\.ru$",
+          "domain:xn--p1ai",
+          "domain:1cfresh.com",
+          "domain:2gis.by",
+          "domain:2gis.com",
+          "domain:2gis.com.cy",
+          "domain:alfa-bank.com",
+          "domain:alfabank.com",
+          "domain:alfafinance.biz",
+          "domain:alfafx.com",
+          "domain:alfaprivate.com",
+          "domain:beta-bank.com",
+          "domain:gazprombank.tech",
+          "domain:investalfabank.com",
+          "domain:moex.com",
+          "domain:tbank-online.com",
+          "domain:tochka.com",
+          "domain:tochka-tech.com",
+          "domain:vtb.com",
+          "domain:vtb.digital",
+          "domain:vtb.promo",
+          "domain:vtb24.com",
+          "domain:vtbrussia.com",
+          "domain:avito.st",
+          "domain:lenta.com",
+          "domain:megamarket.tech",
+          "domain:okko.tv",
+          "domain:ozonusercontent.com",
+          "domain:premier.one",
+          "domain:wildberries.by",
+          "domain:wbstatic.net",
+          "domain:youla.io",
+          "domain:userapi.com",
+          "domain:vk.com",
+          "domain:vk-portal.net",
+          "domain:yads.tech",
+          "domain:yandex",
+          "domain:yandex-bank.net",
+          "domain:yandex.aero",
+          "domain:yandex.az",
+          "domain:yandex.by",
+          "domain:yandex.cloud",
+          "domain:yandex.co.il",
+          "domain:yandex.com",
+          "domain:yandex.com.ge",
+          "domain:yandex.eu",
+          "domain:yandex.fr",
+          "domain:yandex.jobs",
+          "domain:yandex.kg",
+          "domain:yandex.kz",
+          "domain:yandex.net",
+          "domain:yandex.org",
+          "domain:yandexadexchange.net",
+          "domain:yandexcloud.net",
+          "domain:yandexcom.net",
+          "domain:yandexmetrica.com",
+          "domain:yandexwebcache.net",
+          "domain:yandexwebcache.org",
+          "domain:yastat.net",
+          "domain:yastatic.net",
+          "domain:gismeteo.com",
+          "domain:lmru.tech",
+          "domain:mradx.net",
+          "domain:tildaapi.com",
+          "domain:kontur.host"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "type": "field",
+        "ip": ["geoip:ru", "geoip:private"],
+        "outboundTag": "direct"
+      },
+      {
+        "type": "field",
+        "network": "tcp,udp",
+        "balancerTag": "PRIORITY_XHTTP"
+      }
+    ]
+  },
+  "burstObservatory": {
+    "pingConfig": {
+      "timeout": "4s",
+      "interval": "60s",
+      "sampling": 3,
+      "destination": "https://www.gstatic.com/generate_204",
+      "connectivity": ""
+    },
+    "subjectSelector": [
+      "p3-xhttp",
+      "p4-grpc",
+      "p1-vless",
+      "p2-hysteria"
+    ]
+  },
+  "remnawave": {
+    "injectHosts": [
+      {
+        "selector": {
+          "type": "sameTagAsRecipient"
+        },
+        "selectFrom": "HIDDEN",
+        "useHostRemarkAsTag": true
+      }
+    ]
+  }
+}

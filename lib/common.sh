@@ -3,9 +3,10 @@
 readonly INSTALL_DIR="${REMNASSH_INSTALL_DIR:-/opt/remnanode}"
 readonly STATE_FILE="$INSTALL_DIR/state.env"
 readonly PROFILE_FILE="$INSTALL_DIR/full-profile.json"
+readonly BALANCER_FILE="$INSTALL_DIR/happ-balancer.json"
 readonly MARKER_FILE="$INSTALL_DIR/.remnassh-managed"
 readonly CADDY_IMAGE_DEFAULT="caddy:2.11.4-alpine"
-readonly REMNANODE_IMAGE_DEFAULT="remnawave/node:3.4.1"
+readonly REMNANODE_IMAGE_DEFAULT="remnawave/node:3.4.3"
 
 ASSUME_YES="${ASSUME_YES:-0}"
 SKIP_DNS_CHECK="${SKIP_DNS_CHECK:-0}"
@@ -25,7 +26,7 @@ banner() {
     cat <<'EOF'
 ╔══════════════════════════════════════════════════╗
 ║                   RemnaSSH                       ║
-║   REALITY · XHTTP/Caddy · Hysteria2 · Remnawave ║
+║ REALITY · XHTTP · gRPC · Hysteria2 · Remnawave  ║
 ╚══════════════════════════════════════════════════╝
 EOF
 }
@@ -92,6 +93,10 @@ validate_xhttp_mode() {
     case "$1" in stream-one|stream-up|packet-up|auto) return 0 ;; *) return 1 ;; esac
 }
 
+validate_grpc_service_name() {
+    [[ "$1" =~ ^[A-Za-z0-9_.-]{4,64}$ ]]
+}
+
 validate_ip_or_cidr() {
     if ! command -v python3 >/dev/null 2>&1; then
         [[ "$1" =~ ^[0-9a-fA-F:.]+(/[0-9]{1,3})?$ ]]
@@ -112,6 +117,10 @@ load_state() {
     # shellcheck source=/dev/null
     source "$STATE_FILE"
     SITE_TEMPLATE="${SITE_TEMPLATE:-site-studio.html.tpl}"
+    GRPC_SERVICE_NAME="${GRPC_SERVICE_NAME:-grpc_$(random_hex 8)}"
+    if [[ "${REMNANODE_IMAGE:-}" == "remnawave/node:3.4.1" ]]; then
+        REMNANODE_IMAGE="$REMNANODE_IMAGE_DEFAULT"
+    fi
 }
 
 write_state() {
@@ -124,6 +133,7 @@ write_state() {
         printf 'CADDY_INTERNAL_PORT=%q\n' "$CADDY_INTERNAL_PORT"
         printf 'XHTTP_MODE=%q\n' "$XHTTP_MODE"
         printf 'XHTTP_PATH=%q\n' "$XHTTP_PATH"
+        printf 'GRPC_SERVICE_NAME=%q\n' "$GRPC_SERVICE_NAME"
         printf 'SITE_TEMPLATE=%q\n' "${SITE_TEMPLATE:-site-studio.html.tpl}"
         printf 'REALITY_PRIVATE_KEY=%q\n' "$REALITY_PRIVATE_KEY"
         printf 'REALITY_PUBLIC_KEY=%q\n' "$REALITY_PUBLIC_KEY"

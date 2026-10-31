@@ -44,8 +44,8 @@ time_is_synchronized() {
 }
 
 network_tuning_active() {
-    [[ "$(sysctl -n net.core.rmem_max 2>/dev/null)" -ge 16777216 ]] &&
-        [[ "$(sysctl -n net.core.wmem_max 2>/dev/null)" -ge 16777216 ]]
+    [[ "$(sysctl -n net.core.rmem_max 2>/dev/null)" -ge 41943040 ]] &&
+        [[ "$(sysctl -n net.core.wmem_max 2>/dev/null)" -ge 41943040 ]]
 }
 
 diagnostics() {
@@ -73,6 +73,7 @@ diagnostics() {
     if port_is_listening udp 443; then ok "443/udp слушается"; else warn "Xray не слушает 443/udp"; failed=1; fi
     if port_is_listening tcp "$NODE_PORT"; then ok "$NODE_PORT/tcp (Node API) слушается"; else warn "$NODE_PORT/tcp не слушается"; failed=1; fi
     if [[ -S /dev/shm/remnassh-xhttp.sock ]]; then ok "XHTTP Unix socket создан"; else warn "XHTTP Unix socket не создан"; failed=1; fi
+    if [[ -S /dev/shm/remnassh-grpc.sock ]]; then ok "gRPC Unix socket создан"; else warn "gRPC Unix socket не создан"; failed=1; fi
 
     if [[ "$failed" -ne 0 ]]; then
         printf '\nПоследние логи:\n'

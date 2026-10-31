@@ -26,7 +26,7 @@ configure_ufw() {
     done
 
     ufw allow 80/tcp comment 'RemnaSSH ACME' >/dev/null
-    ufw allow 443/tcp comment 'RemnaSSH REALITY/XHTTP' >/dev/null
+    ufw allow 443/tcp comment 'RemnaSSH REALITY/XHTTP/gRPC' >/dev/null
     ufw allow 443/udp comment 'RemnaSSH Hysteria2' >/dev/null
     ufw allow from "$PANEL_IP" to any port "$NODE_PORT" proto tcp comment 'Remnawave Panel' >/dev/null
     ufw default deny incoming >/dev/null
