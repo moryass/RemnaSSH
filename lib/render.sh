@@ -192,6 +192,8 @@ print_result() {
     cat > "$INSTALL_DIR/connection-settings.txt" <<EOF
 Domain: $NODE_DOMAIN
 Public TCP/UDP port: 443
+Alternate TCP ports: ${ALT_TCP_PORTS:-disabled} -> 443
+Alternate UDP ports: ${ALT_UDP_PORTS:-disabled} -> 443
 Reality public key: $REALITY_PUBLIC_KEY
 Reality short ID: $REALITY_SHORT_ID
 Reality SNI: $NODE_DOMAIN
@@ -212,5 +214,6 @@ EOF
     printf '  Host settings:  %s\n' "$INSTALL_DIR/connection-settings.txt"
     printf '  Диагностика:     sudo remnassh diagnostics\n\n'
     warn "443/tcp и 443/udp начнут слушаться после назначения full-profile.json ноде в Remnawave."
+    warn "Для резервных Hosts используйте те же параметры, меняя только порт на ${ALT_TCP_PORTS:-443} (TCP) или ${ALT_UDP_PORTS:-443} (Hysteria2)."
     warn "Hysteria2 в актуальном Xray работает, но учёт UDP-трафика по пользователям в Remnawave может быть неполным."
 }

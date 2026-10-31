@@ -68,6 +68,7 @@ diagnostics() {
     check_item "Сертификат действителен ещё минимум 7 дней" certificate_valid || failed=1
     check_item "Системное время синхронизировано" time_is_synchronized || failed=1
     check_item "UDP-буферы настроены" network_tuning_active || failed=1
+    check_item "Резервные порты перенаправляются на 443" port_aliases_active || failed=1
 
     if port_is_listening tcp 443; then ok "443/tcp слушается"; else warn "Xray не слушает 443/tcp"; failed=1; fi
     if port_is_listening udp 443; then ok "443/udp слушается"; else warn "Xray не слушает 443/udp"; failed=1; fi

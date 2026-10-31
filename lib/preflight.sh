@@ -22,7 +22,7 @@ detect_os() {
 install_base_packages() {
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -y
-    apt-get install -y ca-certificates curl gnupg openssl jq python3 iproute2 dnsutils ufw kmod procps tar
+    apt-get install -y ca-certificates curl gnupg openssl jq python3 iproute2 iptables dnsutils ufw kmod procps tar
 }
 
 install_docker() {
@@ -124,12 +124,19 @@ port_is_listening() {
 }
 
 check_ports() {
+    local alias_port
     local conflicts=()
     port_is_listening tcp 80 && conflicts+=("80/tcp")
     port_is_listening tcp 443 && conflicts+=("443/tcp")
     port_is_listening udp 443 && conflicts+=("443/udp")
     port_is_listening tcp "$NODE_PORT" && conflicts+=("$NODE_PORT/tcp")
     port_is_listening tcp "$CADDY_INTERNAL_PORT" && conflicts+=("127.0.0.1:$CADDY_INTERNAL_PORT/tcp")
+    while IFS= read -r alias_port; do
+        [[ -n "$alias_port" ]] && port_is_listening tcp "$alias_port" && conflicts+=("$alias_port/tcp")
+    done < <(tr ',' '\n' <<<"$ALT_TCP_PORTS")
+    while IFS= read -r alias_port; do
+        [[ -n "$alias_port" ]] && port_is_listening udp "$alias_port" && conflicts+=("$alias_port/udp")
+    done < <(tr ',' '\n' <<<"$ALT_UDP_PORTS")
 
     if ((${#conflicts[@]})) && [[ ! -f "$MARKER_FILE" ]]; then
         die "Заняты требуемые порты: ${conflicts[*]}"

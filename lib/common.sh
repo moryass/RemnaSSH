@@ -97,6 +97,17 @@ validate_grpc_service_name() {
     [[ "$1" =~ ^[A-Za-z0-9_.-]{4,64}$ ]]
 }
 
+validate_alt_port_list() {
+    local value="$1" reserved_port="$2" port
+    [[ -z "$value" ]] && return 0
+    [[ "$value" =~ ^[0-9]+(,[0-9]+)*$ ]] || return 1
+    while IFS= read -r port; do
+        validate_port "$port" || return 1
+        ((10#$port >= 1024)) || return 1
+        [[ "$port" != 443 && "$port" != "$reserved_port" ]] || return 1
+    done < <(tr ',' '\n' <<<"$value")
+}
+
 validate_ip_or_cidr() {
     if ! command -v python3 >/dev/null 2>&1; then
         [[ "$1" =~ ^[0-9a-fA-F:.]+(/[0-9]{1,3})?$ ]]
@@ -118,6 +129,8 @@ load_state() {
     source "$STATE_FILE"
     SITE_TEMPLATE="${SITE_TEMPLATE:-site-studio.html.tpl}"
     GRPC_SERVICE_NAME="${GRPC_SERVICE_NAME:-grpc_$(random_hex 8)}"
+    [[ -v ALT_TCP_PORTS ]] || ALT_TCP_PORTS="8443,2053"
+    [[ -v ALT_UDP_PORTS ]] || ALT_UDP_PORTS="8443"
     if [[ "${REMNANODE_IMAGE:-}" == "remnawave/node:3.4.1" ]]; then
         REMNANODE_IMAGE="$REMNANODE_IMAGE_DEFAULT"
     fi
@@ -134,6 +147,8 @@ write_state() {
         printf 'XHTTP_MODE=%q\n' "$XHTTP_MODE"
         printf 'XHTTP_PATH=%q\n' "$XHTTP_PATH"
         printf 'GRPC_SERVICE_NAME=%q\n' "$GRPC_SERVICE_NAME"
+        printf 'ALT_TCP_PORTS=%q\n' "$ALT_TCP_PORTS"
+        printf 'ALT_UDP_PORTS=%q\n' "$ALT_UDP_PORTS"
         printf 'SITE_TEMPLATE=%q\n' "${SITE_TEMPLATE:-site-studio.html.tpl}"
         printf 'REALITY_PRIVATE_KEY=%q\n' "$REALITY_PRIVATE_KEY"
         printf 'REALITY_PUBLIC_KEY=%q\n' "$REALITY_PUBLIC_KEY"
