@@ -17,7 +17,8 @@ printf '%s\n' \
     'ALT_UDP_PORTS=8443' > "$work/state.env"
 printf '%s\n' \
     'PANEL_TOKEN=test-token' \
-    'PANEL_AUTH_URL=http://127.0.0.1:18080/auth/login?caddy=test-secret' > "$work/panel.env"
+    'PANEL_AUTH_URL=http://127.0.0.1:18080/auth/login?caddy=test-secret' \
+    'PANEL_ENTRY_REMARK=🇸🇪\ Швеция' > "$work/panel.env"
 jq -n '{inbounds:[
     {tag:"VLESS_RAW_REALITY"},
     {tag:"VLESS_XHTTP_CADDY"},
@@ -41,5 +42,13 @@ jq -e '
     (.templates | length) == 1 and
     (.hosts | length) == 12 and
     .nodes[0].configProfile.activeConfigProfileUuid == "11111111-1111-4111-8111-111111111111" and
-    (.squads[0].inbounds | length) == 4
+    (.squads[0].inbounds | length) == 4 and
+    ([.hosts[] | select(.isHidden == false)] | length) == 1 and
+    ([.hosts[] | select(.isHidden == false)][0].remark) == "🇸🇪 Швеция" and
+    ([.hosts[] | select(.isHidden == false)][0].inbound.configProfileInboundUuid) == "55555555-5555-4555-8555-000000000001" and
+    ([.hosts[] | select(.isHidden == false)][0].excludeFromSubscriptionTypes | length) == 5 and
+    ([.hosts[] | select(.remark | startswith("p3-xhttp"))] | all(.securityLayer == "TLS")) and
+    ([.hosts[] | select(.remark | startswith("p4-grpc"))] | all(.securityLayer == "TLS")) and
+    ([.hosts[] | select(.remark | startswith("p2-hysteria"))] | all(.securityLayer == "TLS")) and
+    ([.hosts[] | select(.remark | startswith("p1-vless"))] | all(.securityLayer == "DEFAULT"))
 ' <<<"$state" >/dev/null

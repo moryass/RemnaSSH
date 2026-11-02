@@ -14,6 +14,7 @@ panel_save_state() {
         printf 'PANEL_NODE_UUID=%q\n' "${PANEL_NODE_UUID:-}"
         printf 'PANEL_TEMPLATE_UUID=%q\n' "${PANEL_TEMPLATE_UUID:-}"
         printf 'PANEL_SQUAD_UUID=%q\n' "${PANEL_SQUAD_UUID:-}"
+        printf 'PANEL_ENTRY_REMARK=%q\n' "${PANEL_ENTRY_REMARK:-}"
     } > "$tmp"
     chmod 0600 "$tmp"
     mv -f "$tmp" "$PANEL_STATE_FILE"
@@ -335,26 +336,45 @@ panel_inbound_uuid() {
 panel_host_body() {
     local inbound_uuid="$1" remark="$2" port="$3" path="$4" alpn="$5"
     local hidden="$6" template_uuid="$7" group_tag="$8" host_header="$9"
+    local security_layer="${10:-DEFAULT}" excluded_types="${11:-[]}"
+    local description="${NODE_DOMAIN%%.*}"
+    [[ "$hidden" == true ]] || description="$remark"
     jq -n \
         --arg profile "$PANEL_PROFILE_UUID" --arg inbound "$inbound_uuid" \
         --arg remark "$remark" --arg address "$NODE_DOMAIN" --argjson port "$port" \
         --arg path "$path" --arg sni "$NODE_DOMAIN" --arg host "$host_header" --arg alpn "$alpn" \
         --arg node "$PANEL_NODE_UUID" --arg template "$template_uuid" --arg tag "$group_tag" \
-        --arg description "${NODE_DOMAIN%%.*}" --argjson hidden "$hidden" \
+        --arg description "$description" --arg security "$security_layer" \
+        --argjson hidden "$hidden" --argjson excluded "$excluded_types" \
         '{inbound:{configProfileUuid:$profile,configProfileInboundUuid:$inbound},remark:$remark,
           address:$address,port:$port,path:(if $path == "" then null else $path end),sni:$sni,
           host:(if $host == "" then null else $host end),alpn:(if $alpn == "" then null else $alpn end),
-          fingerprint:"chrome",isDisabled:false,securityLayer:"DEFAULT",tags:[$tag],nodes:[$node],
+          fingerprint:"chrome",isDisabled:false,securityLayer:$security,tags:[$tag],nodes:[$node],
           isHidden:$hidden,serverDescription:($description[0:30]),
+          excludeFromSubscriptionTypes:$excluded,
           xrayJsonTemplateUuid:(if $template == "" then null else $template end)}'
 }
 
 panel_upsert_host() {
-    local hosts="$1" body="$2" remark tag uuid request
+    local hosts="$1" body="$2" remark tag uuid request inbound port hidden template
     remark="$(jq -r '.remark' <<<"$body")"
     tag="$(jq -r '.tags[0]' <<<"$body")"
-    uuid="$(jq -r --arg remark "$remark" --arg tag "$tag" \
-        '.response[] | select(.remark == $remark and (.tags | index($tag))) | .uuid' <<<"$hosts" | head -n 1)"
+    inbound="$(jq -r '.inbound.configProfileInboundUuid' <<<"$body")"
+    port="$(jq -r '.port' <<<"$body")"
+    hidden="$(jq -r '.isHidden' <<<"$body")"
+    template="$(jq -r '.xrayJsonTemplateUuid // empty' <<<"$body")"
+    uuid="$(jq -r --arg tag "$tag" --arg inbound "$inbound" --argjson port "$port" \
+        --argjson hidden "$hidden" --arg template "$template" '
+        .response[] |
+        select(.tags | index($tag)) |
+        select(
+          (if $template != "" then
+             (.isHidden == false and (.xrayJsonTemplateUuid // "") != "")
+           else
+             (.isHidden == $hidden and .port == $port and
+              .inbound.configProfileInboundUuid == $inbound)
+           end)
+        ) | .uuid' <<<"$hosts" | head -n 1)"
     if [[ -n "$uuid" ]]; then
         request="$(jq --arg uuid "$uuid" '. + {uuid:$uuid}' <<<"$body")"
         panel_api PATCH /api/hosts "$request" >/dev/null || return 1
@@ -362,6 +382,30 @@ panel_upsert_host() {
         panel_api POST /api/hosts "$body" >/dev/null || return 1
     fi
     ok "Host синхронизирован: $remark"
+}
+
+panel_detect_entry_remark() {
+    local public_ip response country flag
+    [[ -z "${PANEL_ENTRY_REMARK:-}" ]] || return 0
+
+    public_ip="$(curl -4fsS --connect-timeout 5 --max-time 10 https://api.ipify.org 2>/dev/null || true)"
+    if [[ -n "$public_ip" ]]; then
+        response="$(curl -fsS --connect-timeout 5 --max-time 15 \
+            "https://ipwho.is/${public_ip}?lang=ru&fields=success,country,country_code,city,flag" 2>/dev/null || true)"
+        if jq -e '.success == true' >/dev/null 2>&1 <<<"$response"; then
+            country="$(jq -r '.country // empty' <<<"$response")"
+            flag="$(jq -r '.flag.emoji // empty' <<<"$response")"
+        fi
+    fi
+
+    if [[ -n "${country:-}" ]]; then
+        PANEL_ENTRY_REMARK="${flag:+$flag }$country"
+        ok "Определена локация входной ноды: $PANEL_ENTRY_REMARK" >&2
+        panel_save_state
+    else
+        PANEL_ENTRY_REMARK="${NODE_DOMAIN%%.*}"
+        warn "Не удалось определить локацию; входная нода названа $PANEL_ENTRY_REMARK" >&2
+    fi
 }
 
 panel_sync_hosts() {
@@ -376,30 +420,32 @@ panel_sync_hosts() {
     hysteria="$(panel_inbound_uuid "$profile" HYSTERIA2_TLS)"
     [[ -n "$reality" && -n "$xhttp" && -n "$grpc" && -n "$hysteria" ]] || die "Не удалось сопоставить inbound профиля"
     hosts="$(panel_api GET /api/hosts)" || return 1
+    panel_detect_entry_remark
 
-    body="$(panel_host_body "$xhttp" "AUTO-$short" 443 "$XHTTP_PATH" h2 false "$PANEL_TEMPLATE_UUID" "$group_tag" "$NODE_DOMAIN")"
+    body="$(panel_host_body "$reality" "$PANEL_ENTRY_REMARK" 443 "" "" false "$PANEL_TEMPLATE_UUID" \
+        "$group_tag" "" DEFAULT '["XRAY_BASE64","MIHOMO","STASH","CLASH","SINGBOX"]')"
     panel_upsert_host "$hosts" "$body" || return 1
-    body="$(panel_host_body "$xhttp" "p3-xhttp-$short" 443 "$XHTTP_PATH" h2 true "" "$group_tag" "$NODE_DOMAIN")"
+    body="$(panel_host_body "$xhttp" "p3-xhttp-$short" 443 "$XHTTP_PATH" h2 true "" "$group_tag" "$NODE_DOMAIN" TLS)"
     panel_upsert_host "$hosts" "$body" || return 1
-    body="$(panel_host_body "$grpc" "p4-grpc-$short" 443 "$GRPC_SERVICE_NAME" h2 true "" "$group_tag" "$NODE_DOMAIN")"
+    body="$(panel_host_body "$grpc" "p4-grpc-$short" 443 "$GRPC_SERVICE_NAME" h2 true "" "$group_tag" "$NODE_DOMAIN" TLS)"
     panel_upsert_host "$hosts" "$body" || return 1
     body="$(panel_host_body "$reality" "p1-vless-$short" 443 "" "" true "" "$group_tag" "")"
     panel_upsert_host "$hosts" "$body" || return 1
-    body="$(panel_host_body "$hysteria" "p2-hysteria-$short" 443 "" h3 true "" "$group_tag" "")"
+    body="$(panel_host_body "$hysteria" "p2-hysteria-$short" 443 "" h3 true "" "$group_tag" "" TLS)"
     panel_upsert_host "$hosts" "$body" || return 1
 
     while IFS= read -r port; do
         [[ -n "$port" ]] || continue
-        body="$(panel_host_body "$xhttp" "p3-xhttp-$short-$port" "$port" "$XHTTP_PATH" h2 true "" "$group_tag" "$NODE_DOMAIN")"
+        body="$(panel_host_body "$xhttp" "p3-xhttp-$short-$port" "$port" "$XHTTP_PATH" h2 true "" "$group_tag" "$NODE_DOMAIN" TLS)"
         panel_upsert_host "$hosts" "$body" || return 1
-        body="$(panel_host_body "$grpc" "p4-grpc-$short-$port" "$port" "$GRPC_SERVICE_NAME" h2 true "" "$group_tag" "$NODE_DOMAIN")"
+        body="$(panel_host_body "$grpc" "p4-grpc-$short-$port" "$port" "$GRPC_SERVICE_NAME" h2 true "" "$group_tag" "$NODE_DOMAIN" TLS)"
         panel_upsert_host "$hosts" "$body" || return 1
         body="$(panel_host_body "$reality" "p1-vless-$short-$port" "$port" "" "" true "" "$group_tag" "")"
         panel_upsert_host "$hosts" "$body" || return 1
     done < <(tr ',' '\n' <<<"$ALT_TCP_PORTS")
     while IFS= read -r port; do
         [[ -n "$port" ]] || continue
-        body="$(panel_host_body "$hysteria" "p2-hysteria-$short-$port" "$port" "" h3 true "" "$group_tag" "")"
+        body="$(panel_host_body "$hysteria" "p2-hysteria-$short-$port" "$port" "" h3 true "" "$group_tag" "" TLS)"
         panel_upsert_host "$hosts" "$body" || return 1
     done < <(tr ',' '\n' <<<"$ALT_UDP_PORTS")
 }
