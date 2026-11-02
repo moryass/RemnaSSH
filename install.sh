@@ -75,6 +75,8 @@ source "$SCRIPT_DIR/lib/tuning.sh"
 source "$SCRIPT_DIR/lib/diagnostics.sh"
 # shellcheck source=lib/maintenance.sh
 source "$SCRIPT_DIR/lib/maintenance.sh"
+# shellcheck source=lib/probe.sh
+source "$SCRIPT_DIR/lib/probe.sh"
 
 usage() {
     cat <<'EOF'
@@ -87,6 +89,8 @@ Usage:
   sudo bash install.sh diagnostics
   sudo bash install.sh update
   sudo bash install.sh backup
+  sudo bash install.sh restore [ARCHIVE|latest]
+  sudo bash install.sh probe CLIENT_CONFIG.json
 
 Install options:
   --domain DOMAIN             Domain whose A/AAAA record points to this server
@@ -254,7 +258,11 @@ update_stack() {
     require_root
     load_state
     require_command docker
+    local old_caddy_image old_node_image update_failed=0
+    old_caddy_image="$(running_image_id remnassh-caddy)"
+    old_node_image="$(running_image_id remnanode)"
     backup_stack
+    install_runtime_files
     write_state
     render_stack
     validate_rendered_files
@@ -262,8 +270,18 @@ update_stack() {
     configure_port_aliases
     cd "$INSTALL_DIR"
     docker compose pull
-    docker compose up -d --remove-orphans
-    diagnostics || true
+    if ! docker compose up -d --remove-orphans; then
+        update_failed=1
+    elif ! validate_xray_profile; then
+        update_failed=1
+    elif ! diagnostics; then
+        update_failed=1
+    fi
+    if ((update_failed)); then
+        rollback_container_images "$old_caddy_image" "$old_node_image" || true
+        die "Обновление не прошло проверки; предыдущие образы восстановлены"
+    fi
+    ok "Обновление установлено и прошло проверки"
 }
 
 main() {
@@ -283,6 +301,8 @@ main() {
         diagnostics|doctor) diagnostics ;;
         update) update_stack ;;
         backup) backup_stack ;;
+        restore) restore_stack "${1:-latest}" ;;
+        probe) probe_stack "${1:-}" ;;
         -h|--help|help) usage ;;
         *) usage; die "Неизвестная команда: $command" ;;
     esac

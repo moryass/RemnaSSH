@@ -14,33 +14,81 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Check shell syntax
-        run: bash -n install.sh lib/*.sh
+        run: bash -n install.sh lib/*.sh templates/*.sh.tpl
 
       - name: Run ShellCheck
-        run: shellcheck -x install.sh
+        run: shellcheck -x install.sh templates/*.sh.tpl
 
-      - name: Validate profile template
-        run: jq -e . templates/full-profile.json.tpl >/dev/null
+      - name: Validate JSON templates
+        run: |
+          jq -e . templates/full-profile.json.tpl >/dev/null
+          jq -e . templates/happ-balancer.json >/dev/null
 
       - name: Validate Compose template
         run: |
           work="$(mktemp -d)"
           sed \
             -e 's|__CADDY_IMAGE__|caddy:2.11.4-alpine|g' \
-            -e 's|__REMNANODE_IMAGE__|remnawave/node:3.4.1|g' \
+            -e 's|__REMNANODE_IMAGE__|remnawave/node:3.4.3|g' \
             templates/docker-compose.yml.tpl > "$work/docker-compose.yml"
           printf '%s\n' \
             'NODE_DOMAIN=node.example.com' \
-            'CADDY_INTERNAL_PORT=8443' > "$work/.env"
+            'ACME_EMAIL=admin@example.com' \
+            'CADDY_INTERNAL_PORT=8443' \
+            'XHTTP_PATH=/api/v3/test/video_stream.mp4' \
+            'GRPC_SERVICE_NAME=grpc_test' > "$work/.env"
           printf '%s\n' 'NODE_PORT=2222' 'SECRET_KEY=test' > "$work/node.env"
           touch "$work/Caddyfile"
           mkdir -p "$work/www" "$work/caddy-data" "$work/caddy-config"
           docker compose -f "$work/docker-compose.yml" config --quiet
 
+      - name: Validate Caddy configurations
+        run: |
+          env_file="$(mktemp)"
+          printf '%s\n' \
+            'NODE_DOMAIN=node.example.com' \
+            'ACME_EMAIL=admin@example.com' \
+            'CADDY_INTERNAL_PORT=8443' \
+            'XHTTP_PATH=/api/v3/test/video_stream.mp4' \
+            'GRPC_SERVICE_NAME=grpc_test' > "$env_file"
+          for config in templates/Caddyfile.tpl templates/Caddyfile.bootstrap.tpl; do
+            docker run --rm --entrypoint caddy --env-file "$env_file" \
+              -v "$PWD/$config:/etc/caddy/Caddyfile:ro" \
+              caddy:2.11.4-alpine validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          done
+
+      - name: Validate profile with Xray
+        run: |
+          work="$(mktemp -d)"
+          image='remnawave/node:3.4.3'
+          key_output="$(docker run --rm --entrypoint /usr/local/bin/xray "$image" x25519)"
+          private_key="$(awk -F': ' '/PrivateKey/ {print $2; exit}' <<<"$key_output")"
+          test -n "$private_key"
+          cert_dir="$work/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/node.example.com"
+          mkdir -p "$cert_dir"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -subj '/CN=node.example.com' \
+            -keyout "$cert_dir/node.example.com.key" \
+            -out "$cert_dir/node.example.com.crt" >/dev/null 2>&1
+          sed \
+            -e 's|__DOMAIN__|node.example.com|g' \
+            -e 's|__CADDY_INTERNAL_PORT__|8443|g' \
+            -e 's|__XHTTP_PATH__|/api/v3/test/video_stream.mp4|g' \
+            -e 's|__XHTTP_MODE__|stream-one|g' \
+            -e 's|__GRPC_SERVICE_NAME__|grpc_test|g' \
+            -e "s|__REALITY_PRIVATE_KEY__|$private_key|g" \
+            -e 's|__REALITY_SHORT_ID__|0123456789abcdef|g' \
+            templates/full-profile.json.tpl > "$work/profile.json"
+          docker run --rm --entrypoint /usr/local/bin/xray \
+            -v "$work/profile.json:/etc/xray/config.json:ro" \
+            -v "$work/data:/data:ro" \
+            "$image" run -test -config /etc/xray/config.json
+
       - name: Test installed command symlink
         run: |
           ln -s "$PWD/install.sh" /tmp/remnassh
-          /tmp/remnassh help | grep -q 'sudo bash install.sh backup'
+          /tmp/remnassh help | grep -q 'sudo bash install.sh restore'
+          /tmp/remnassh help | grep -q 'sudo bash install.sh probe'
 
       - name: Test standalone bootstrap
         run: |
