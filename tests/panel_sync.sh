@@ -6,6 +6,7 @@ repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR="$repo_dir"
 work="$(mktemp -d)"
 export REMNASSH_INSTALL_DIR="$work"
+mkdir -p "$work/tool"
 
 printf '%s\n' \
     'NODE_DOMAIN=node.example.com' \

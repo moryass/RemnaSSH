@@ -10,8 +10,8 @@ prepare_directories() {
 install_runtime_files() {
     local target="$INSTALL_DIR/tool"
     if [[ "$(readlink -f "$SCRIPT_DIR")" != "$(readlink -f "$target" 2>/dev/null || printf '%s' "$target")" ]]; then
-        install -m 0755 "$SCRIPT_DIR/install.sh" "$target/install.sh"
         install -d -m 0755 "$target/lib" "$target/templates"
+        install -m 0755 "$SCRIPT_DIR/install.sh" "$target/install.sh"
         install -m 0644 "$SCRIPT_DIR"/lib/*.sh "$target/lib/"
         install -m 0644 "$SCRIPT_DIR"/templates/* "$target/templates/"
     fi
