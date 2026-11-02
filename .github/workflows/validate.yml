@@ -166,7 +166,7 @@ jobs:
           grep -q '<title>Helio Documentation</title>' "$work/node/www/index.html"
           grep -q 'node.example.com' "$work/node/www/index.html"
           test -s "$work/node/www/favicon.svg"
-          grep -q 'SITE_TEMPLATE=site-docs.html.tpl' "$work/node/state.env"
+          sudo grep -q 'SITE_TEMPLATE=site-docs.html.tpl' "$work/node/state.env"
 
       - name: Test standalone bootstrap
         run: |
