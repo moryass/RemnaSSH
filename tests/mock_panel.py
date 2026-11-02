@@ -65,7 +65,29 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def authenticated(self):
+        if "panel_auth=ok" in self.headers.get("Cookie", ""):
+            return True
+        data = b"<html><body>authorization required</body></html>"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+        return False
+
     def do_GET(self):
+        if self.path == "/auth/login?caddy=test-secret":
+            self.send_response(302)
+            self.send_header("Set-Cookie", "panel_auth=ok; Path=/; HttpOnly")
+            self.send_header("Location", "/authorized")
+            self.end_headers()
+            return
+        if self.path == "/authorized":
+            self.send_json({"authorized": True})
+            return
+        if self.path != "/state" and not self.authenticated():
+            return
         routes = {
             "/api/config-profiles": {"response": {"total": len(state["profiles"]), "configProfiles": state["profiles"]}},
             "/api/nodes": {"response": state["nodes"]},
@@ -80,6 +102,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(routes[self.path])
 
     def do_POST(self):
+        if not self.authenticated():
+            return
         body = self.body()
         if self.path == "/api/config-profiles":
             profile = profile_from(body)
@@ -100,6 +124,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json({"message": "not found"}, 404)
 
     def do_PATCH(self):
+        if not self.authenticated():
+            return
         body = self.body()
         if self.path == "/api/config-profiles":
             profile = profile_from(body)

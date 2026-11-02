@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 readonly PANEL_STATE_FILE="$INSTALL_DIR/panel.env"
+readonly PANEL_COOKIE_FILE="$INSTALL_DIR/panel.cookies"
 PANEL_SYNCED_PROFILE=""
 
 panel_save_state() {
@@ -8,6 +9,7 @@ panel_save_state() {
     {
         printf 'PANEL_URL=%q\n' "$PANEL_URL"
         printf 'PANEL_TOKEN=%q\n' "$PANEL_TOKEN"
+        printf 'PANEL_AUTH_URL=%q\n' "${PANEL_AUTH_URL:-}"
         printf 'PANEL_PROFILE_UUID=%q\n' "${PANEL_PROFILE_UUID:-}"
         printf 'PANEL_NODE_UUID=%q\n' "${PANEL_NODE_UUID:-}"
         printf 'PANEL_TEMPLATE_UUID=%q\n' "${PANEL_TEMPLATE_UUID:-}"
@@ -17,11 +19,63 @@ panel_save_state() {
     mv -f "$tmp" "$PANEL_STATE_FILE"
 }
 
+panel_origin_from_url() {
+    local url="$1" rest authority
+    case "$url" in
+        https://*) rest="${url#https://}"; printf 'https://' ;;
+        http://*) rest="${url#http://}"; printf 'http://' ;;
+        *) return 1 ;;
+    esac
+    authority="${rest%%/*}"
+    authority="${authority%%\?*}"
+    [[ -n "$authority" ]] || return 1
+    printf '%s' "$authority"
+}
+
+panel_set_endpoint() {
+    local value="$1" origin
+    [[ "$value" =~ ^https?://[^[:space:]\"\\]+$ ]] || die "Некорректная ссылка панели"
+    origin="$(panel_origin_from_url "$value")" || die "Не удалось определить домен панели"
+    PANEL_URL="$origin"
+    if [[ "${value%/}" != "$origin" ]]; then
+        PANEL_AUTH_URL="$value"
+    else
+        PANEL_AUTH_URL=""
+    fi
+}
+
+panel_authorize_cookie() {
+    local config
+    [[ -n "${PANEL_AUTH_URL:-}" ]] || return 1
+    [[ "$PANEL_AUTH_URL" =~ ^https?://[^[:space:]\"\\]+$ ]] || return 1
+    PANEL_URL="$(panel_origin_from_url "$PANEL_AUTH_URL")" || return 1
+    config="$(mktemp)"
+    printf 'url = "%s"\n' "$PANEL_AUTH_URL" > "$config"
+    : > "$PANEL_COOKIE_FILE"
+    chmod 0600 "$config" "$PANEL_COOKIE_FILE"
+    if ! curl -fsSL --retry 2 --connect-timeout 10 --max-time 45 --max-redirs 8 \
+        --user-agent 'Mozilla/5.0 RemnaSSH' --config "$config" \
+        --cookie "$PANEL_COOKIE_FILE" --cookie-jar "$PANEL_COOKIE_FILE" \
+        -o /dev/null; then
+        rm -f -- "$config"
+        warn "Не удалось пройти secret-ссылку авторизации"
+        return 1
+    fi
+    rm -f -- "$config"
+    if ! awk -F '\t' 'NF >= 7 && $7 != "" {found=1} END {exit !found}' "$PANEL_COOKIE_FILE"; then
+        warn "Ссылка открылась, но cookie авторизации не получена"
+        return 1
+    fi
+    ok "Cookie-защита панели пройдена" >&2
+}
+
 panel_api() {
     local method="$1" path="$2" data="${3:-}"
-    local headers response status
+    local retried="${4:-0}" headers response status reason
+    local -a cookie_args=()
     headers="$(mktemp)"
     response="$(mktemp)"
+    [[ -s "$PANEL_COOKIE_FILE" ]] && cookie_args=(--cookie "$PANEL_COOKIE_FILE")
     {
         printf 'Authorization: Bearer %s\n' "$PANEL_TOKEN"
         printf 'Accept: application/json\n'
@@ -31,14 +85,14 @@ panel_api() {
 
     if [[ -n "$data" ]]; then
         if ! status="$(printf '%s' "$data" | curl -sS --connect-timeout 10 --max-time 90 \
-            -X "$method" "$PANEL_URL$path" -H "@$headers" --data-binary @- \
+            -X "$method" "$PANEL_URL$path" -H "@$headers" "${cookie_args[@]}" --data-binary @- \
             -o "$response" -w '%{http_code}')"; then
             rm -f -- "$headers" "$response"
             warn "Панель недоступна: $PANEL_URL"
             return 1
         fi
     elif ! status="$(curl -sS --connect-timeout 10 --max-time 90 \
-        -X "$method" "$PANEL_URL$path" -H "@$headers" \
+        -X "$method" "$PANEL_URL$path" -H "@$headers" "${cookie_args[@]}" \
         -o "$response" -w '%{http_code}')"; then
         rm -f -- "$headers" "$response"
         warn "Панель недоступна: $PANEL_URL"
@@ -46,8 +100,21 @@ panel_api() {
     fi
     rm -f -- "$headers"
 
-    if [[ "$status" != 2* ]]; then
-        warn "API Remnawave вернул HTTP $status: $(tr '\n' ' ' < "$response" | cut -c1-500)"
+    reason=""
+    [[ "$status" == 2* ]] || reason="HTTP $status"
+    if [[ -z "$reason" ]] && ! jq -e . "$response" >/dev/null 2>&1; then
+        reason="вместо JSON получена страница авторизации"
+    fi
+    if [[ -n "$reason" && "$retried" == 0 && -n "${PANEL_AUTH_URL:-}" ]]; then
+        rm -f -- "$response"
+        if panel_authorize_cookie; then
+            panel_api "$method" "$path" "$data" 1
+            return
+        fi
+        return 1
+    fi
+    if [[ -n "$reason" ]]; then
+        warn "API Remnawave: $reason — $(tr '\n' ' ' < "$response" | cut -c1-500)"
         rm -f -- "$response"
         return 1
     fi
@@ -56,13 +123,18 @@ panel_api() {
 }
 
 panel_load_credentials() {
+    local endpoint response new_endpoint new_token
     if [[ -f "$PANEL_STATE_FILE" ]]; then
         # Файл создаётся установщиком и доступен только root.
         # shellcheck source=/dev/null
         source "$PANEL_STATE_FILE"
     fi
-    if [[ -z "${PANEL_URL:-}" ]]; then
-        read -r -p "URL панели Remnawave (https://panel.example.com): " PANEL_URL
+    if [[ -z "${PANEL_URL:-}" && -z "${PANEL_AUTH_URL:-}" ]]; then
+        read -r -s -p "Secret-ссылка входа или обычный URL панели: " endpoint
+        printf '\n'
+        panel_set_endpoint "$endpoint"
+    elif [[ -n "${PANEL_AUTH_URL:-}" ]]; then
+        PANEL_URL="$(panel_origin_from_url "$PANEL_AUTH_URL")" || die "Некорректная сохранённая auth-ссылка"
     fi
     PANEL_URL="${PANEL_URL%/}"
     [[ "$PANEL_URL" =~ ^https?://[^/]+(:[0-9]+)?$ ]] || die "Некорректный URL панели: $PANEL_URL"
@@ -73,14 +145,19 @@ panel_load_credentials() {
     fi
     [[ -n "$PANEL_TOKEN" ]] || die "API-токен не задан"
 
-    local response new_url
+    if [[ -n "${PANEL_AUTH_URL:-}" && ! -s "$PANEL_COOKIE_FILE" ]]; then
+        panel_authorize_cookie || true
+    fi
     if ! response="$(panel_api GET /api/config-profiles)"; then
-        warn "Сохранённые реквизиты панели не сработали"
-        read -r -p "Новый URL панели или Enter, чтобы оставить $PANEL_URL: " new_url
-        [[ -z "$new_url" ]] || PANEL_URL="${new_url%/}"
-        [[ "$PANEL_URL" =~ ^https?://[^/]+(:[0-9]+)?$ ]] || die "Некорректный URL панели: $PANEL_URL"
-        read -r -s -p "Новый API-токен Remnawave: " PANEL_TOKEN
+        warn "Авторизация панели не сработала"
+        read -r -s -p "Новая secret-ссылка/URL или Enter, чтобы оставить текущую: " new_endpoint
         printf '\n'
+        [[ -z "$new_endpoint" ]] || panel_set_endpoint "$new_endpoint"
+        [[ "$PANEL_URL" =~ ^https?://[^/]+(:[0-9]+)?$ ]] || die "Некорректный URL панели: $PANEL_URL"
+        [[ -z "${PANEL_AUTH_URL:-}" ]] || panel_authorize_cookie || true
+        read -r -s -p "Новый API-токен Remnawave или Enter, чтобы оставить текущий: " new_token
+        printf '\n'
+        [[ -z "$new_token" ]] || PANEL_TOKEN="$new_token"
         [[ -n "$PANEL_TOKEN" ]] || die "API-токен не задан"
         response="$(panel_api GET /api/config-profiles)" || die "Не удалось авторизоваться в API панели"
     fi

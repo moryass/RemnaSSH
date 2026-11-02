@@ -16,8 +16,8 @@ printf '%s\n' \
     'ALT_TCP_PORTS=8443,2053' \
     'ALT_UDP_PORTS=8443' > "$work/state.env"
 printf '%s\n' \
-    'PANEL_URL=http://127.0.0.1:18080' \
-    'PANEL_TOKEN=test-token' > "$work/panel.env"
+    'PANEL_TOKEN=test-token' \
+    'PANEL_AUTH_URL=http://127.0.0.1:18080/auth/login?caddy=test-secret' > "$work/panel.env"
 jq -n '{inbounds:[
     {tag:"VLESS_RAW_REALITY"},
     {tag:"VLESS_XHTTP_CADDY"},
