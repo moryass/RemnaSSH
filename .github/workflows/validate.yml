@@ -158,7 +158,11 @@ jobs:
             'REALITY_PRIVATE_KEY=test-private' \
             'REALITY_PUBLIC_KEY=test-public' \
             'REALITY_SHORT_ID=0123456789abcdef' > "$work/node/state.env"
-          sudo env REMNASSH_INSTALL_DIR="$work/node" ./install.sh site site-docs.html.tpl
+          if ! output="$(sudo env REMNASSH_INSTALL_DIR="$work/node" bash "$PWD/install.sh" site site-docs.html.tpl 2>&1)"; then
+            printf '::error title=Site command failed::%s\n' "${output//$'\n'/%0A}"
+            exit 1
+          fi
+          test -f "$work/node/www/index.html" || { echo '::error::Rendered index.html is missing'; exit 1; }
           grep -q '<title>Helio Documentation</title>' "$work/node/www/index.html"
           grep -q 'node.example.com' "$work/node/www/index.html"
           test -s "$work/node/www/favicon.svg"
