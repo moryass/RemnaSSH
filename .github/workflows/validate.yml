@@ -93,12 +93,12 @@ jobs:
       - name: Test interactive menu
         run: |
           work="$(mktemp -d)"
-          output="$(printf '0\n' | REMNASSH_INSTALL_DIR="$work/empty" ./install.sh menu)"
+          output="$(printf '0\n' | sudo env REMNASSH_INSTALL_DIR="$work/empty" ./install.sh menu)"
           grep -q 'Установить Remnawave Node' <<<"$output"
           mkdir -p "$work/installed"
           printf 'NODE_DOMAIN=node.example.com\n' > "$work/installed/state.env"
           touch "$work/installed/docker-compose.yml"
-          output="$(printf '0\n' | REMNASSH_INSTALL_DIR="$work/installed" ./install.sh menu)"
+          output="$(printf '0\n' | sudo env REMNASSH_INSTALL_DIR="$work/installed" ./install.sh menu)"
           grep -q 'Обновить RemnaSSH, Node и конфигурацию' <<<"$output"
 
       - name: Test standalone bootstrap
