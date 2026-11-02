@@ -90,6 +90,17 @@ jobs:
           /tmp/remnassh help | grep -q 'sudo bash install.sh restore'
           /tmp/remnassh help | grep -q 'sudo bash install.sh probe'
 
+      - name: Test interactive menu
+        run: |
+          work="$(mktemp -d)"
+          output="$(printf '0\n' | script -qec "REMNASSH_INSTALL_DIR='$work/empty' ./install.sh menu" /dev/null)"
+          grep -q 'Установить Remnawave Node' <<<"$output"
+          mkdir -p "$work/installed"
+          printf 'NODE_DOMAIN=node.example.com\n' > "$work/installed/state.env"
+          touch "$work/installed/docker-compose.yml"
+          output="$(printf '0\n' | script -qec "REMNASSH_INSTALL_DIR='$work/installed' ./install.sh menu" /dev/null)"
+          grep -q 'Обновить RemnaSSH, Node и конфигурацию' <<<"$output"
+
       - name: Test standalone bootstrap
         run: |
           stage="$(mktemp -d)"

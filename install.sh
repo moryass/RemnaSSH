@@ -77,12 +77,15 @@ source "$SCRIPT_DIR/lib/diagnostics.sh"
 source "$SCRIPT_DIR/lib/maintenance.sh"
 # shellcheck source=lib/probe.sh
 source "$SCRIPT_DIR/lib/probe.sh"
+# shellcheck source=lib/menu.sh
+source "$SCRIPT_DIR/lib/menu.sh"
 
 usage() {
     cat <<'EOF'
 RemnaSSH — Remnawave multi-protocol node installer
 
 Usage:
+  sudo bash install.sh menu
   sudo bash install.sh install [options]
   sudo bash install.sh generate
   sudo bash install.sh status
@@ -91,6 +94,9 @@ Usage:
   sudo bash install.sh backup
   sudo bash install.sh restore [ARCHIVE|latest]
   sudo bash install.sh probe CLIENT_CONFIG.json
+  sudo bash install.sh restart
+  sudo bash install.sh logs
+  sudo bash install.sh backups
 
 Install options:
   --domain DOMAIN             Domain whose A/AAAA record points to this server
@@ -287,11 +293,38 @@ update_stack() {
     ok "Обновление установлено и прошло проверки"
 }
 
+restart_stack() {
+    state_or_fail
+    local health
+    cd "$INSTALL_DIR" || die "Не удалось перейти в $INSTALL_DIR"
+    docker compose restart
+    for _ in {1..15}; do
+        health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' remnassh-caddy 2>/dev/null || true)"
+        [[ "$health" == healthy ]] && break
+        sleep 2
+    done
+    diagnostics
+}
+
+show_logs() {
+    state_or_fail
+    cd "$INSTALL_DIR" || die "Не удалось перейти в $INSTALL_DIR"
+    docker compose logs --tail=150 --timestamps caddy remnanode
+}
+
+show_connection_settings() {
+    require_root
+    load_state
+    [[ -f "$INSTALL_DIR/connection-settings.txt" ]] || die "Файл параметров подключений не найден"
+    cat "$INSTALL_DIR/connection-settings.txt"
+}
+
 main() {
-    local command="${1:-install}"
+    local command="${1:-menu}"
     [[ $# -eq 0 ]] || shift
 
     case "$command" in
+        menu) interactive_menu ;;
         install)
             parse_install_args "$@"
             banner
@@ -303,9 +336,14 @@ main() {
         status) status_report ;;
         diagnostics|doctor) diagnostics ;;
         update) update_stack ;;
+        remote-update) update_from_remote ;;
         backup) backup_stack ;;
         restore) restore_stack "${1:-latest}" ;;
         probe) probe_stack "${1:-}" ;;
+        restart) restart_stack ;;
+        logs) show_logs ;;
+        backups) list_backups ;;
+        settings) show_connection_settings ;;
         -h|--help|help) usage ;;
         *) usage; die "Неизвестная команда: $command" ;;
     esac

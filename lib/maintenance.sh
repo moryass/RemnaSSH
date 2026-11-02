@@ -22,6 +22,48 @@ backup_stack() {
     ok "Резервная копия: $archive"
 }
 
+list_backups() {
+    require_root
+    local backup_dir="$INSTALL_DIR/backups"
+    local -a archives=()
+    [[ -d "$backup_dir" ]] || die "Резервных копий пока нет"
+    mapfile -t archives < <(find "$backup_dir" -maxdepth 1 -type f -name 'remnassh-*.tar.gz' -printf '%T@ %TY-%Tm-%Td %TH:%TM %k KB %p\n' |
+        sort -nr)
+    ((${#archives[@]})) || die "Резервных копий пока нет"
+    printf 'Резервные копии:\n\n'
+    printf '%s\n' "${archives[@]}" | cut -d' ' -f2-
+}
+
+update_from_remote() {
+    require_root
+    require_command curl
+    local temp_dir installer url downloaded=0
+    temp_dir="$(mktemp -d)"
+    installer="$temp_dir/install.sh"
+
+    for url in \
+        "https://raw.githubusercontent.com/moryass/RemnaSSH/main/install.sh" \
+        "https://cdn.jsdelivr.net/gh/moryass/RemnaSSH@main/install.sh"; do
+        if curl -fsSL --retry 3 --connect-timeout 15 "$url" -o "$installer" &&
+            head -n 1 "$installer" | grep -qx '#!/usr/bin/env bash' &&
+            bash -n "$installer"; then
+            downloaded=1
+            break
+        fi
+    done
+    if ((downloaded == 0)); then
+        rm -rf -- "$temp_dir"
+        die "Не удалось скачать актуальный установщик"
+    fi
+
+    if bash "$installer" update; then
+        rm -rf -- "$temp_dir"
+        return 0
+    fi
+    rm -rf -- "$temp_dir"
+    return 1
+}
+
 resolve_backup_archive() {
     local requested="${1:-latest}" backup_dir="$INSTALL_DIR/backups" archive
     if [[ "$requested" == latest ]]; then
