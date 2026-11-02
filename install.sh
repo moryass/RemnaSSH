@@ -269,7 +269,10 @@ update_stack() {
     configure_firewall
     configure_port_aliases
     cd "$INSTALL_DIR"
-    docker compose pull
+    if ! docker compose pull; then
+        rollback_container_images "$old_caddy_image" "$old_node_image" || true
+        die "Не удалось загрузить все образы; предыдущие образы сохранены"
+    fi
     if ! docker compose up -d --remove-orphans; then
         update_failed=1
     elif ! validate_xray_profile; then
