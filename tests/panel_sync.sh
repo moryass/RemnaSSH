@@ -47,6 +47,7 @@ jq -e '
     ([.hosts[] | select(.isHidden == false)][0].remark) == "🇸🇪 Швеция" and
     ([.hosts[] | select(.isHidden == false)][0].inbound.configProfileInboundUuid) == "55555555-5555-4555-8555-000000000001" and
     ([.hosts[] | select(.isHidden == false)][0].excludeFromSubscriptionTypes | length) == 5 and
+    ([.hosts[]] | all(.fingerprint == "firefox")) and
     ([.hosts[] | select(.remark | startswith("p3-xhttp"))] | all(.securityLayer == "TLS")) and
     ([.hosts[] | select(.remark | startswith("p4-grpc"))] | all(.securityLayer == "TLS")) and
     ([.hosts[] | select(.remark | startswith("p2-hysteria"))] | all(.securityLayer == "TLS")) and

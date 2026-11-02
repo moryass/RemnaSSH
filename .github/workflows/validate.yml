@@ -43,6 +43,7 @@ jobs:
             jq -e '\''
               .remark == "p3-xhttp-node" and
               .path == "/api/test" and
+              .fingerprint == "firefox" and
               .securityLayer == "TLS" and
               .excludeFromSubscriptionTypes == [] and
               .isHidden == true and

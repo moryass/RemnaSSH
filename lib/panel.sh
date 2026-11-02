@@ -349,7 +349,7 @@ panel_host_body() {
         '{inbound:{configProfileUuid:$profile,configProfileInboundUuid:$inbound},remark:$remark,
           address:$address,port:$port,path:(if $path == "" then null else $path end),sni:$sni,
           host:(if $host == "" then null else $host end),alpn:(if $alpn == "" then null else $alpn end),
-          fingerprint:"chrome",isDisabled:false,securityLayer:$security,tags:[$tag],nodes:[$node],
+          fingerprint:"firefox",isDisabled:false,securityLayer:$security,tags:[$tag],nodes:[$node],
           isHidden:$hidden,serverDescription:($description[0:30]),
           excludeFromSubscriptionTypes:$excluded,
           xrayJsonTemplateUuid:(if $template == "" then null else $template end)}'
