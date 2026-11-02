@@ -104,6 +104,7 @@ installed_menu() {
         printf '  8. Резервные копии и восстановление\n'
         printf '  9. Проверить VPN клиентским JSON\n'
         printf ' 10. Последние логи\n'
+        printf ' 11. Сменить сайт-заглушку\n'
         printf '\n  0. Выход\n\n'
         read -r -p "Выберите действие: " choice
         case "$choice" in
@@ -128,8 +129,9 @@ installed_menu() {
                 [[ -z "$config" ]] || menu_run probe "$config"
                 ;;
             10) menu_run logs ;;
+            11) menu_run site ;;
             0) return ;;
-            *) warn "Выберите пункт от 0 до 10"; sleep 1 ;;
+            *) warn "Выберите пункт от 0 до 11"; sleep 1 ;;
         esac
     done
 }

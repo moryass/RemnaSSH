@@ -99,6 +99,7 @@ Usage:
   sudo bash install.sh restart
   sudo bash install.sh logs
   sudo bash install.sh backups
+  sudo bash install.sh site [random|TEMPLATE]
   sudo bash install.sh panel-sync
 
 Install options:
@@ -200,7 +201,8 @@ collect_settings() {
     XHTTP_PATH="${XHTTP_PATH:-/api/v3/$(random_hex 8)/video_stream.mp4}"
     REALITY_SHORT_ID="${REALITY_SHORT_ID:-$(random_hex 8)}"
     if [[ -z "${SITE_TEMPLATE:-}" ]]; then
-        local -a site_templates=(site-journal.html.tpl site-studio.html.tpl site-workshop.html.tpl)
+        local -a site_templates=()
+        mapfile -t site_templates < <(site_template_names)
         SITE_TEMPLATE="${site_templates[RANDOM % ${#site_templates[@]}]}"
     fi
 }
@@ -348,6 +350,7 @@ main() {
         logs) show_logs ;;
         backups) list_backups ;;
         settings) show_connection_settings ;;
+        site) change_site "${1:-}" ;;
         panel-sync) panel_sync ;;
         -h|--help|help) usage ;;
         *) usage; die "Неизвестная команда: $command" ;;

@@ -7,6 +7,80 @@ prepare_directories() {
     chmod 600 "$MARKER_FILE"
 }
 
+site_template_names() {
+    printf '%s\n' \
+        site-studio.html.tpl \
+        site-journal.html.tpl \
+        site-workshop.html.tpl \
+        site-docs.html.tpl \
+        site-status.html.tpl
+}
+
+site_template_label() {
+    case "$1" in
+        site-studio.html.tpl) printf 'Корпоративный IT-сайт' ;;
+        site-journal.html.tpl) printf 'Городская библиотека' ;;
+        site-workshop.html.tpl) printf 'Бухгалтерская компания' ;;
+        site-docs.html.tpl) printf 'Документация продукта' ;;
+        site-status.html.tpl) printf 'Страница состояния сервиса' ;;
+        *) printf '%s' "$1" ;;
+    esac
+}
+
+render_site() {
+    local template_dir="$INSTALL_DIR/tool/templates"
+    local site_template="$template_dir/$SITE_TEMPLATE"
+    [[ -f "$site_template" ]] || die "Не найден шаблон сайта: $SITE_TEMPLATE"
+    install -d -m 0755 "$INSTALL_DIR/www"
+    sed \
+        -e "s|__DOMAIN__|$NODE_DOMAIN|g" \
+        -e "s|__EMAIL__|${ACME_EMAIL:-}|g" \
+        "$site_template" > "$INSTALL_DIR/www/index.html"
+    cp "$template_dir/site-icon.svg" "$INSTALL_DIR/www/favicon.svg"
+    chmod 0644 "$INSTALL_DIR/www/index.html"
+    chmod 0644 "$INSTALL_DIR/www/favicon.svg"
+}
+
+change_site() {
+    require_root
+    load_state
+    install_runtime_files
+    local requested="${1:-}" choice index=1 template suffix
+    local -a templates=()
+    mapfile -t templates < <(site_template_names)
+
+    if [[ -z "$requested" ]]; then
+        printf '\nВыберите сайт-заглушку:\n'
+        for template in "${templates[@]}"; do
+            suffix=""
+            if [[ "$template" == "$SITE_TEMPLATE" ]]; then
+                suffix=" (текущий)"
+            fi
+            printf '  %d. %s%s\n' "$index" "$(site_template_label "$template")" "$suffix"
+            ((index++))
+        done
+        printf '  0. Случайный вариант\n\n'
+        read -r -p "Номер шаблона: " choice
+        [[ "$choice" =~ ^[0-9]+$ ]] || die "Некорректный номер шаблона"
+        if ((choice == 0)); then
+            requested=random
+        elif ((choice >= 1 && choice <= ${#templates[@]})); then
+            requested="${templates[choice-1]}"
+        else
+            die "Некорректный номер шаблона"
+        fi
+    fi
+
+    if [[ "$requested" == random ]]; then
+        requested="${templates[RANDOM % ${#templates[@]}]}"
+    fi
+    printf '%s\n' "${templates[@]}" | grep -Fxq "$requested" || die "Неизвестный шаблон сайта: $requested"
+    SITE_TEMPLATE="$requested"
+    write_state
+    render_site
+    ok "Установлен сайт: $(site_template_label "$SITE_TEMPLATE")"
+}
+
 install_runtime_files() {
     local target="$INSTALL_DIR/tool"
     if [[ "$(readlink -f "$SCRIPT_DIR")" != "$(readlink -f "$target" 2>/dev/null || printf '%s' "$target")" ]]; then
@@ -46,13 +120,7 @@ write_secret() {
 
 render_stack() {
     local template_dir="$INSTALL_DIR/tool/templates"
-    local site_template="$template_dir/$SITE_TEMPLATE"
-    [[ -f "$site_template" ]] || die "Не найден шаблон сайта: $SITE_TEMPLATE"
-
-    sed \
-        -e "s|__DOMAIN__|$NODE_DOMAIN|g" \
-        -e "s|__EMAIL__|$ACME_EMAIL|g" \
-        "$site_template" > "$INSTALL_DIR/www/index.html"
+    render_site
 
     cp "$template_dir/Caddyfile.tpl" "$INSTALL_DIR/Caddyfile.final"
     cp "$template_dir/Caddyfile.bootstrap.tpl" "$INSTALL_DIR/Caddyfile.bootstrap"
