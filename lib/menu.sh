@@ -134,7 +134,6 @@ installed_menu() {
 
 interactive_menu() {
     require_root
-    [[ -t 0 ]] || die "Интерактивное меню требует терминал. Для автоматической установки используйте команду install с параметрами."
     if menu_installed; then
         installed_menu
         return
