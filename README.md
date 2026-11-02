@@ -63,7 +63,28 @@ sudo bash install.sh install \
 
 Для обычных HTTPS-запросов установщик выбирает один из встроенных сайтов-заглушек. Выбранный шаблон сохраняется при повторной установке.
 
-## Настройка панели
+## Синхронизация с панелью
+
+Создайте в Remnawave API-токен с правами чтения и изменения Config Profiles, Nodes, Internal Squads, Hosts и Subscription Templates. Затем откройте меню и выберите `Синхронизировать с панелью Remnawave` или выполните:
+
+```bash
+sudo remnassh panel-sync
+```
+
+Скрипт запросит URL панели и токен, предложит выбрать ноду и Internal Squad, после чего автоматически:
+
+- создаст или обновит Config Profile с четырьмя inbound;
+- назначит профиль и все inbound выбранной ноде;
+- добавит inbound в выбранный Internal Squad;
+- создаст XRAY_JSON-шаблон `RemnaSSH Balancer`;
+- создаст основной Host `AUTO-*`, скрытые Hosts всех транспортов и копии для резервных портов;
+- повторно запросит объекты из панели и проверит результат.
+
+UUID созданных объектов и реквизиты API сохраняются в `/opt/remnanode/panel.env` с доступом только для root. Повторная синхронизация обновляет существующие объекты и не создаёт копии.
+
+Ниже приведены параметры для ручной настройки, если API-интеграция не используется.
+
+## Ручная настройка панели
 
 1. Создайте Config Profile и вставьте содержимое `/opt/remnanode/full-profile.json`.
 2. Назначьте профиль ноде и включите четыре inbound.
@@ -118,7 +139,7 @@ sudo bash install.sh install \
 3. REALITY + Vision;
 4. Hysteria2 + TLS.
 
-У каждого Host в панели должен быть назначен соответствующий тег:
+Remark каждого скрытого Host должен начинаться с соответствующего префикса:
 
 - `p4-grpc` — gRPC;
 - `p3-xhttp` — XHTTP;
@@ -143,6 +164,7 @@ sudo remnassh logs
 sudo remnassh generate
 sudo remnassh backup
 sudo remnassh backups
+sudo remnassh panel-sync
 sudo remnassh restore latest
 sudo remnassh restore /opt/remnanode/backups/remnassh-DATE.tar.gz
 sudo remnassh probe /root/happ-client.json

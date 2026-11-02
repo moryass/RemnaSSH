@@ -6,3 +6,5 @@ state.env
 secret-key
 node.env
 full-profile.json
+__pycache__/
+*.pyc

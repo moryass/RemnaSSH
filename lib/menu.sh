@@ -100,9 +100,10 @@ installed_menu() {
         printf '  4. Перезапустить сервисы\n'
         printf '  5. Пересобрать профиль ноды\n'
         printf '  6. Показать параметры подключений\n'
-        printf '  7. Резервные копии и восстановление\n'
-        printf '  8. Проверить VPN клиентским JSON\n'
-        printf '  9. Последние логи\n'
+        printf '  7. Синхронизировать с панелью Remnawave\n'
+        printf '  8. Резервные копии и восстановление\n'
+        printf '  9. Проверить VPN клиентским JSON\n'
+        printf ' 10. Последние логи\n'
         printf '\n  0. Выход\n\n'
         read -r -p "Выберите действие: " choice
         case "$choice" in
@@ -120,14 +121,15 @@ installed_menu() {
                 ;;
             5) menu_run generate ;;
             6) menu_run settings ;;
-            7) backup_menu ;;
-            8)
+            7) menu_run panel-sync ;;
+            8) backup_menu ;;
+            9)
                 read -r -p "Полный путь к клиентскому JSON: " config
                 [[ -z "$config" ]] || menu_run probe "$config"
                 ;;
-            9) menu_run logs ;;
+            10) menu_run logs ;;
             0) return ;;
-            *) warn "Выберите пункт от 0 до 9"; sleep 1 ;;
+            *) warn "Выберите пункт от 0 до 10"; sleep 1 ;;
         esac
     done
 }

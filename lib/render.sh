@@ -213,7 +213,7 @@ EOF
     printf '  Happ balancer:  %s\n' "$BALANCER_FILE"
     printf '  Host settings:  %s\n' "$INSTALL_DIR/connection-settings.txt"
     printf '  Диагностика:     sudo remnassh diagnostics\n\n'
-    warn "443/tcp и 443/udp начнут слушаться после назначения full-profile.json ноде в Remnawave."
-    warn "Для резервных Hosts используйте те же параметры, меняя только порт на ${ALT_TCP_PORTS:-443} (TCP) или ${ALT_UDP_PORTS:-443} (Hysteria2)."
+    warn "443/tcp и 443/udp начнут слушаться после синхронизации с панелью: sudo remnassh panel-sync"
+    warn "Синхронизация автоматически создаёт основные и резервные Hosts для портов ${ALT_TCP_PORTS:-443}/tcp и ${ALT_UDP_PORTS:-443}/udp."
     warn "Hysteria2 в актуальном Xray работает, но учёт UDP-трафика по пользователям в Remnawave может быть неполным."
 }

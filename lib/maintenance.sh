@@ -11,7 +11,7 @@ backup_stack() {
     archive="$backup_dir/remnassh-$timestamp.tar.gz"
 
     install -d -m 0700 "$backup_dir"
-    for path in .remnassh-managed state.env node.env secret-key full-profile.json happ-balancer.json connection-settings.txt \
+    for path in .remnassh-managed state.env panel.env node.env secret-key full-profile.json happ-balancer.json connection-settings.txt \
         docker-compose.yml Caddyfile Caddyfile.final Caddyfile.bootstrap .env www caddy-data caddy-config; do
         [[ -e "$INSTALL_DIR/$path" ]] && paths+=("$path")
     done
@@ -79,7 +79,7 @@ resolve_backup_archive() {
 validate_backup_archive() {
     local archive="$1" entry
     local -a allowed=(
-        .remnassh-managed state.env node.env secret-key full-profile.json happ-balancer.json
+        .remnassh-managed state.env panel.env node.env secret-key full-profile.json happ-balancer.json
         connection-settings.txt docker-compose.yml Caddyfile Caddyfile.final Caddyfile.bootstrap
         .env www caddy-data caddy-config
     )

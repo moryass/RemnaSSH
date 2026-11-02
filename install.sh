@@ -77,6 +77,8 @@ source "$SCRIPT_DIR/lib/diagnostics.sh"
 source "$SCRIPT_DIR/lib/maintenance.sh"
 # shellcheck source=lib/probe.sh
 source "$SCRIPT_DIR/lib/probe.sh"
+# shellcheck source=lib/panel.sh
+source "$SCRIPT_DIR/lib/panel.sh"
 # shellcheck source=lib/menu.sh
 source "$SCRIPT_DIR/lib/menu.sh"
 
@@ -97,6 +99,7 @@ Usage:
   sudo bash install.sh restart
   sudo bash install.sh logs
   sudo bash install.sh backups
+  sudo bash install.sh panel-sync
 
 Install options:
   --domain DOMAIN             Domain whose A/AAAA record points to this server
@@ -247,6 +250,7 @@ install_stack() {
     validate_xray_profile
     install_command
     print_result
+    offer_panel_sync
 }
 
 generate_profile() {
@@ -344,6 +348,7 @@ main() {
         logs) show_logs ;;
         backups) list_backups ;;
         settings) show_connection_settings ;;
+        panel-sync) panel_sync ;;
         -h|--help|help) usage ;;
         *) usage; die "Неизвестная команда: $command" ;;
     esac

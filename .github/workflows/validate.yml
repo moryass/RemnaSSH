@@ -14,15 +14,46 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Check shell syntax
-        run: bash -n install.sh lib/*.sh templates/*.sh.tpl
+        run: bash -n install.sh lib/*.sh templates/*.sh.tpl tests/*.sh
 
       - name: Run ShellCheck
-        run: shellcheck -x install.sh templates/*.sh.tpl
+        run: shellcheck -x install.sh templates/*.sh.tpl tests/*.sh
 
       - name: Validate JSON templates
         run: |
           jq -e . templates/full-profile.json.tpl >/dev/null
           jq -e . templates/happ-balancer.json >/dev/null
+
+      - name: Test panel payload generation
+        run: |
+          REMNASSH_INSTALL_DIR=/tmp/remnassh-panel-test bash -c '
+            source lib/common.sh
+            source lib/panel.sh
+            PANEL_PROFILE_UUID=11111111-1111-4111-8111-111111111111
+            PANEL_NODE_UUID=22222222-2222-4222-8222-222222222222
+            NODE_DOMAIN=node.example.com
+            body=$(panel_host_body \
+              33333333-3333-4333-8333-333333333333 \
+              p3-xhttp-node 443 /api/test h2 true "" REMNASSH:22222222 node.example.com)
+            jq -e '\''
+              .remark == "p3-xhttp-node" and
+              .path == "/api/test" and
+              .isHidden == true and
+              .nodes[0] == "22222222-2222-4222-8222-222222222222" and
+              .inbound.configProfileUuid == "11111111-1111-4111-8111-111111111111"
+            '\'' <<<"$body" >/dev/null
+          '
+
+      - name: Test panel synchronization
+        run: |
+          python3 tests/mock_panel.py &
+          mock_pid=$!
+          trap 'kill "$mock_pid" 2>/dev/null || true' EXIT
+          for _ in {1..20}; do
+            curl -fsS http://127.0.0.1:18080/state >/dev/null && break
+            sleep 0.2
+          done
+          sudo bash tests/panel_sync.sh
 
       - name: Validate Compose template
         run: |
