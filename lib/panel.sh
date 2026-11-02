@@ -347,6 +347,7 @@ panel_verify_sync() {
 panel_sync() {
     require_root
     load_state
+    install_runtime_files
     require_command curl
     require_command jq
     [[ -s "$PROFILE_FILE" && -s "$BALANCER_FILE" ]] || die "Сначала сгенерируйте профиль ноды"

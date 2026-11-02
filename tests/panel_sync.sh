@@ -3,6 +3,7 @@
 set -Eeuo pipefail
 
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$repo_dir"
 work="$(mktemp -d)"
 export REMNASSH_INSTALL_DIR="$work"
 
@@ -26,6 +27,8 @@ cp "$repo_dir/templates/happ-balancer.json" "$work/happ-balancer.json"
 
 # shellcheck source=lib/common.sh
 source "$repo_dir/lib/common.sh"
+# shellcheck source=lib/render.sh
+source "$repo_dir/lib/render.sh"
 # shellcheck source=lib/panel.sh
 source "$repo_dir/lib/panel.sh"
 panel_sync
