@@ -168,8 +168,10 @@ panel_load_credentials() {
 }
 
 panel_profile_name() {
-    local name="RemnaSSH ${NODE_DOMAIN%%.*}"
-    printf '%s' "${name:0:30}"
+    local suffix label
+    suffix="$(profile_tag_suffix "$NODE_DOMAIN")"
+    label="${NODE_DOMAIN%%.*}"
+    printf 'RemnaSSH %s-%s' "${label:0:13}" "$suffix"
 }
 
 panel_sync_profile() {
@@ -329,8 +331,10 @@ panel_sync_template() {
 }
 
 panel_inbound_uuid() {
-    local profile="$1" tag="$2"
-    jq -r --arg tag "$tag" '.inbounds[] | select(.tag == $tag) | .uuid' <<<"$profile" | head -n 1
+    local profile="$1" base_tag="$2" tag
+    tag="$(profile_inbound_tag "$base_tag")"
+    jq -r --arg tag "$tag" --arg legacy "$base_tag" \
+        '.inbounds[] | select(.tag == $tag or .tag == $legacy) | .uuid' <<<"$profile" | head -n 1
 }
 
 panel_host_body() {

@@ -75,6 +75,20 @@ random_hex() {
     fi
 }
 
+profile_tag_suffix() {
+    local domain="$1" digest
+    if command -v sha256sum >/dev/null 2>&1; then
+        digest="$(printf '%s' "$domain" | sha256sum | awk '{print $1}')"
+    else
+        digest="$(printf '%s' "$domain" | openssl dgst -sha256 | awk '{print $NF}')"
+    fi
+    printf '%s' "${digest:0:8}" | tr '[:lower:]' '[:upper:]'
+}
+
+profile_inbound_tag() {
+    printf '%s_%s' "$1" "$(profile_tag_suffix "$NODE_DOMAIN")"
+}
+
 validate_domain() {
     local value="$1"
     [[ ${#value} -le 253 ]] || return 1

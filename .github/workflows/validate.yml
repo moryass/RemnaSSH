@@ -37,6 +37,9 @@ jobs:
             PANEL_PROFILE_UUID=11111111-1111-4111-8111-111111111111
             PANEL_NODE_UUID=22222222-2222-4222-8222-222222222222
             NODE_DOMAIN=node.example.com
+            test "$(profile_tag_suffix "$NODE_DOMAIN")" = 0B3ADEAA
+            test "$(profile_inbound_tag VLESS_XHTTP_CADDY)" = VLESS_XHTTP_CADDY_0B3ADEAA
+            test "$(panel_profile_name)" = "RemnaSSH node-0B3ADEAA"
             body=$(panel_host_body \
               33333333-3333-4333-8333-333333333333 \
               p3-xhttp-node 443 /api/test h2 true "" REMNASSH:22222222 node.example.com TLS)
@@ -111,6 +114,7 @@ jobs:
             -out "$cert_dir/node.example.com.crt" >/dev/null 2>&1
           sed \
             -e 's|__DOMAIN__|node.example.com|g' \
+            -e 's|__NODE_TAG__|0B3ADEAA|g' \
             -e 's|__CADDY_INTERNAL_PORT__|8443|g' \
             -e 's|__XHTTP_PATH__|/api/v3/test/video_stream.mp4|g' \
             -e 's|__XHTTP_MODE__|stream-one|g' \

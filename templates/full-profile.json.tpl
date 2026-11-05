@@ -4,7 +4,7 @@
   },
   "inbounds": [
     {
-      "tag": "VLESS_RAW_REALITY",
+      "tag": "VLESS_RAW_REALITY___NODE_TAG__",
       "listen": "0.0.0.0",
       "port": 443,
       "protocol": "vless",
@@ -31,7 +31,7 @@
       }
     },
     {
-      "tag": "VLESS_XHTTP_CADDY",
+      "tag": "VLESS_XHTTP_CADDY___NODE_TAG__",
       "listen": "/dev/shm/remnassh-xhttp.sock,0666",
       "protocol": "vless",
       "settings": {
@@ -53,7 +53,7 @@
       }
     },
     {
-      "tag": "HYSTERIA2_TLS",
+      "tag": "HYSTERIA2_TLS___NODE_TAG__",
       "listen": "0.0.0.0",
       "port": 443,
       "protocol": "hysteria",
@@ -91,7 +91,7 @@
       }
     },
     {
-      "tag": "VLESS_GRPC_CADDY",
+      "tag": "VLESS_GRPC_CADDY___NODE_TAG__",
       "listen": "/dev/shm/remnassh-grpc.sock,0666",
       "protocol": "vless",
       "settings": {

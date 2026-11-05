@@ -5,12 +5,31 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
 PROFILE_UUID = "11111111-1111-4111-8111-111111111111"
+LEGACY_PROFILE_UUID = "99999999-9999-4999-8999-999999999999"
 NODE_UUID = "22222222-2222-4222-8222-222222222222"
 SQUAD_UUID = "33333333-3333-4333-8333-333333333333"
 TEMPLATE_UUID = "44444444-4444-4444-8444-444444444444"
 
 state = {
-    "profiles": [],
+    "profiles": [{
+        "uuid": LEGACY_PROFILE_UUID,
+        "name": "Existing node",
+        "config": {"inbounds": [
+            {"tag": "VLESS_RAW_REALITY"},
+            {"tag": "VLESS_XHTTP_CADDY"},
+            {"tag": "HYSTERIA2_TLS"},
+            {"tag": "VLESS_GRPC_CADDY"},
+        ]},
+        "inbounds": [
+            {"uuid": f"77777777-7777-4777-8777-{index:012d}", "tag": tag}
+            for index, tag in enumerate((
+                "VLESS_RAW_REALITY",
+                "VLESS_XHTTP_CADDY",
+                "HYSTERIA2_TLS",
+                "VLESS_GRPC_CADDY",
+            ), 1)
+        ],
+    }],
     "nodes": [{
         "uuid": NODE_UUID,
         "name": "Test node",
@@ -38,6 +57,18 @@ def profile_from(body):
         "config": body["config"],
         "inbounds": inbounds,
     }
+
+
+def has_duplicate_inbound_tag(body):
+    profile_uuid = body.get("uuid")
+    existing = {
+        inbound["tag"]
+        for profile in state["profiles"]
+        if profile["uuid"] != profile_uuid
+        for inbound in profile["inbounds"]
+    }
+    incoming = {inbound["tag"] for inbound in body["config"].get("inbounds", [])}
+    return bool(existing & incoming)
 
 
 def objects_for_inbounds(uuids):
@@ -106,6 +137,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         body = self.body()
         if self.path == "/api/config-profiles":
+            if has_duplicate_inbound_tag(body):
+                self.send_json({"message": "Inbound tags must be unique", "errorCode": "A113"}, 409)
+                return
             profile = profile_from(body)
             state["profiles"].append(profile)
             self.send_json({"response": profile}, 201)
@@ -128,6 +162,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         body = self.body()
         if self.path == "/api/config-profiles":
+            if has_duplicate_inbound_tag(body):
+                self.send_json({"message": "Inbound tags must be unique", "errorCode": "A113"}, 409)
+                return
             profile = profile_from(body)
             state["profiles"] = [profile if item["uuid"] == body["uuid"] else item for item in state["profiles"]]
             self.send_json({"response": profile})

@@ -148,11 +148,14 @@ render_stack() {
 render_profile() {
     local source_template="$INSTALL_DIR/tool/templates/full-profile.json.tpl"
     local balancer_template="$INSTALL_DIR/tool/templates/happ-balancer.json"
+    local node_tag
     [[ -f "$source_template" ]] || source_template="$SCRIPT_DIR/templates/full-profile.json.tpl"
     [[ -f "$balancer_template" ]] || balancer_template="$SCRIPT_DIR/templates/happ-balancer.json"
+    node_tag="$(profile_tag_suffix "$NODE_DOMAIN")"
 
     sed \
         -e "s|__DOMAIN__|$NODE_DOMAIN|g" \
+        -e "s|__NODE_TAG__|$node_tag|g" \
         -e "s|__CADDY_INTERNAL_PORT__|$CADDY_INTERNAL_PORT|g" \
         -e "s|__XHTTP_PATH__|$XHTTP_PATH|g" \
         -e "s|__XHTTP_MODE__|$XHTTP_MODE|g" \

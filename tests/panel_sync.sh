@@ -20,10 +20,10 @@ printf '%s\n' \
     'PANEL_AUTH_URL=http://127.0.0.1:18080/auth/login?caddy=test-secret' \
     'PANEL_ENTRY_REMARK=🇸🇪\ Швеция' > "$work/panel.env"
 jq -n '{inbounds:[
-    {tag:"VLESS_RAW_REALITY"},
-    {tag:"VLESS_XHTTP_CADDY"},
-    {tag:"HYSTERIA2_TLS"},
-    {tag:"VLESS_GRPC_CADDY"}
+    {tag:"VLESS_RAW_REALITY_0B3ADEAA"},
+    {tag:"VLESS_XHTTP_CADDY_0B3ADEAA"},
+    {tag:"HYSTERIA2_TLS_0B3ADEAA"},
+    {tag:"VLESS_GRPC_CADDY_0B3ADEAA"}
 ]}' > "$work/full-profile.json"
 cp "$repo_dir/templates/happ-balancer.json" "$work/happ-balancer.json"
 
@@ -38,7 +38,16 @@ panel_sync
 
 state="$(curl -fsS http://127.0.0.1:18080/state)"
 jq -e '
-    (.profiles | length) == 1 and
+    (.profiles[] | select(.uuid == "11111111-1111-4111-8111-111111111111")) as $managed |
+    (.profiles | length) == 2 and
+    ([.profiles[] | select(.uuid == "11111111-1111-4111-8111-111111111111")] | length) == 1 and
+    $managed.name == "RemnaSSH node-0B3ADEAA" and
+    ([$managed.inbounds[].tag] == [
+        "VLESS_RAW_REALITY_0B3ADEAA",
+        "VLESS_XHTTP_CADDY_0B3ADEAA",
+        "HYSTERIA2_TLS_0B3ADEAA",
+        "VLESS_GRPC_CADDY_0B3ADEAA"
+    ]) and
     (.templates | length) == 1 and
     (.hosts | length) == 12 and
     .nodes[0].configProfile.activeConfigProfileUuid == "11111111-1111-4111-8111-111111111111" and
